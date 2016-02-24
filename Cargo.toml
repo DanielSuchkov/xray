@@ -4,3 +4,5 @@ version = "0.1.0"
 authors = ["Daniel Suchkov <suc-daniil@yandex.ru>"]
 
 [dependencies]
+sfml = "0.10.1"
+cgmath = "0.7.0"
