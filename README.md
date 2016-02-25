@@ -11,5 +11,5 @@ Simple render
 * Tonemapping
 * Don't leave Rust
 
-# Howtobuild
+# How to build
 You need SFML and CSFML. That's all (for now).
