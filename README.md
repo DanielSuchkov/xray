@@ -5,10 +5,12 @@ Simple render
 * CPU multithread path tracing
 * OpenCL path tracing
 * Transparancy
-* SSS
 * DOF
+* More BRDF's
 * BSDF
+* BSSRDF
 * Tonemapping
+* Fractals
 * Don't leave Rust
 
 # How to build
