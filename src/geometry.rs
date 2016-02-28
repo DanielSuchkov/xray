@@ -1,11 +1,10 @@
-#![allow(unused_imports)]
 #![allow(dead_code)]
 
-use math::{FloatExtra, Vec3f, EuclideanVector, Vector};
+use math::{/*FloatExtra, */Vec3f, EuclideanVector, Vector};
 use scene::{MaterialID, LightID};
-use std::{f32, f64};
+// use std::{f32, f64};
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Copy)]
 pub enum SurfaceProperties {
     Material(MaterialID),
     Light(LightID)
@@ -26,22 +25,20 @@ pub struct AABBox {
 
 #[derive(Debug, Clone)]
 pub struct Ray {
-    orig: Vec3f, // origin
-    dir: Vec3f, // direction
+    pub orig: Vec3f, // origin
+    pub dir: Vec3f, // direction
 }
 
 #[derive(Debug, Clone)]
 pub struct Sphere {
-    center: Vec3f,
-    radius: f32,
-    material: MaterialID,
+    pub center: Vec3f,
+    pub radius: f32,
+    pub surface: SurfaceProperties,
 }
 
 pub trait Geometry {
     fn intersect(&self, ray: &Ray) -> Option<Intersection>;
-    fn build_aabbox(&self) -> AABBox {
-        unimplemented!();
-    }
+    fn build_aabbox(&self) -> AABBox;
 }
 
 impl Sphere {
@@ -59,7 +56,7 @@ impl Geometry for Sphere {
         let b = 2.0 * ray.dir.dot(local_origin) as f64;
         let c = (local_origin.dot(local_origin) - self.r2()) as f64;
 
-        // Must use doubles, because when B ~ sqrt(B*B - 4*a*c)
+        // Must use f64, because when b ~ sqrt(b*b - 4*a*c)
         // the resulting t is imprecise enough to get around ray epsilons
         let disc: f64 = b * b - 4.0 * a * c;
 
@@ -71,8 +68,7 @@ impl Geometry for Sphere {
         let q = if b < 0.0 { (-b - disc_sqrt) / 2.0 } else { (-b + disc_sqrt) / 2.0 };
 
         let (t0, t1) = {
-            let t0 = q / a;
-            let t1 = c / q;
+            let (t0, t1) = (q / a, c / q);
             if t0 > t1 { (t1, t0) } else { (t0, t1) }
         };
 
@@ -87,7 +83,14 @@ impl Geometry for Sphere {
         Some(Intersection {
             normal: (local_origin + Vec3f::from_value(result_t) * ray.dir).normalize(),
             dist: result_t,
-            surface: SurfaceProperties::Material(self.material)
+            surface: self.surface
         })
+    }
+
+    fn build_aabbox(&self) -> AABBox {
+        AABBox {
+            min: self.center - Vec3f::from_value(self.radius),
+            max: self.center + Vec3f::from_value(self.radius)
+        }
     }
 }

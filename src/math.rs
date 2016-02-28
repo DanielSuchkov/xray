@@ -1,10 +1,12 @@
 use std;
 use std::ops::{Div, Mul};
-use cgmath::Vector3;
+use cgmath::{Vector2, Vector3};
 
 pub use cgmath::{EuclideanVector, Vector};
 
 pub type Vec3f = Vector3<f32>;
+pub type Vec2f = Vector2<f32>;
+pub type Vec2u = Vector2<usize>;
 
 pub trait FloatExtra {
     fn to_radian(self) -> Self;

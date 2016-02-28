@@ -3,20 +3,21 @@ extern crate cgmath;
 
 pub mod math;
 pub mod geometry;
-pub mod material;
+pub mod brdf;
 pub mod scene;
+pub mod framebuffer;
 
 use sfml::graphics::{RenderWindow, Color, RenderTarget};
 use sfml::window::{VideoMode, ContextSettings, event, window_style};
-use math::Vec3f;
+// use math::Vec3f;
 
-fn f32_to_u8(f: f32) -> u8 {
-    (f.min(1.0) * 255.0) as u8
-}
+// fn f32_to_u8(f: f32) -> u8 {
+//     (f.min(1.0) * 255.0) as u8
+// }
 
-fn vec3f_to_color(v: Vec3f) -> Color {
-    Color::new_rgb(f32_to_u8(v.x), f32_to_u8(v.y), f32_to_u8(v.z))
-}
+// fn vec3f_to_color(v: Vec3f) -> Color {
+//     Color::new_rgb(f32_to_u8(v.x), f32_to_u8(v.y), f32_to_u8(v.z))
+// }
 
 fn main() {
     let mut window = RenderWindow::new(
