@@ -52,7 +52,7 @@ fn get_cosine_lambert_sample(normal: Vec3f, rnd: (f32, f32)) -> Vec3f {
 }
 
 fn get_phong_sample(normal: Vec3f, out_dir: Vec3f, phong_exp: f32, rnd: (f32, f32)) -> Vec3f {
-    let reflect_dir = out_dir.reflect(normal);
+    let reflect_dir = out_dir.reflect(&normal);
 
     let phi = rnd.0 * 2.0 * f32::consts::PI;
     let costheta = rnd.1.powf(1.0 / (phong_exp + 1.0));

@@ -7,7 +7,6 @@ pub mod math;
 pub mod geometry;
 pub mod render;
 pub mod pathtracer;
-pub mod transform;
 pub mod brdf;
 pub mod scene;
 pub mod framebuffer;
@@ -15,7 +14,10 @@ pub mod camera;
 
 use sfml::graphics::{RenderWindow, Color, RenderTarget};
 use sfml::window::{VideoMode, ContextSettings, event, window_style};
-// use math::Vec3f;
+
+use scene::{Scene, DefaultScene};
+use geometry::GeometryList;
+// use math::{Vec3f, Vec2u};
 
 // fn f32_to_u8(f: f32) -> u8 {
 //     (f.min(1.0) * 255.0) as u8
@@ -26,6 +28,7 @@ use sfml::window::{VideoMode, ContextSettings, event, window_style};
 // }
 
 fn main() {
+
     let mut window = RenderWindow::new(
             VideoMode::new_init(800, 600, 32),
             "XRay",
@@ -33,10 +36,11 @@ fn main() {
             &ContextSettings::default())
         .expect("Cannot create a new Render Window.");
 
-    let /*mut*/ im = sfml::graphics::Image::new(800, 600).expect("Shit...");
+    let mut im = sfml::graphics::Image::new(800, 600).expect("Shit...");
     let tex = sfml::graphics::Texture::new_from_image(&im).expect("Dam it");
     let sprite = sfml::graphics::Sprite::new_with_texture(&tex).expect("Ugh...");
-
+    let mut scene = scene::DefaultScene::<GeometryList>::new();
+    // scene.add_object(obj)
     while window.is_open() {
         for event in window.events() {
             match event {

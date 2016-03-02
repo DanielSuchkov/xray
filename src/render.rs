@@ -2,27 +2,34 @@
 
 use rand::StdRng;
 use framebuffer::FrameBuffer;
-use scene::{Scene, DefaultScene};
+use scene::Scene;
 use camera::PerspectiveCamera;
-use geometry::{GeometryManager, GeometryList};
+use geometry::GeometryManager;
+use math::Vec2u;
 
-pub trait Render/*<T: Scene>*/ {
-    // fn new(new_scene: T) -> Self;
-    fn setup_scene(&mut self);
+pub trait Render<S: Scene> {
+    fn new(cam: PerspectiveCamera, scene: S) -> Self;
     fn iterate(&mut self);
     fn get_framebuffer(&self) -> &FrameBuffer;
 }
 
-struct EyeLight {
+struct EyeLight<S: Scene> {
     rng: StdRng,
     camera: PerspectiveCamera,
-    scene: DefaultScene<GeometryList>,
+    scene: S,
     frame: FrameBuffer,
 }
 
-impl Render for EyeLight {
-    fn setup_scene(&mut self) {
-
+impl<S> Render<S> for EyeLight<S> where S: Scene {
+    fn new(cam: PerspectiveCamera, scene: S) -> EyeLight<S> {
+        let resolution = cam.get_view_size();
+        let resolution = Vec2u::new(resolution.x as usize, resolution.y as usize);
+        EyeLight {
+            rng: StdRng::new().expect("cant create ranger"),
+            camera: cam,
+            scene: scene,
+            frame: FrameBuffer::new(resolution),
+        }
     }
 
     fn iterate(&mut self) {

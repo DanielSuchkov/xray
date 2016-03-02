@@ -3,34 +3,58 @@ use std::ops::{Div, Mul};
 
 pub use nalgebra::{BaseNum};
 
-pub type Mat4f = Mat4<f32>;
-pub type Vec3f = Vec3<f32>;
-pub type Vec2f = Vec2<f32>;
-pub type Vec2u = Vec2<usize>;
-
 pub mod vector_traits {
-    pub use nalgebra::{Vec2, Vec3, Vec4, FloatVec, Absolute, BaseFloat, Dot, Norm, Cross};
+    pub use nalgebra::{Absolute, BaseFloat, Cross, Dot, FloatVec, Norm, Vec2, Vec3, Vec4};
 
     pub trait VectorExtra<T>: FloatVec<T> where T: BaseFloat {
-        fn reflect(self, normal: Self) -> Self;
+        fn reflect(self, normal: &Self) -> Self;
     }
 
     impl<T, S> VectorExtra<S> for T
-        where T: FloatVec<S>,
+        where T: FloatVec<S> + Clone,
               S: From<f32> + BaseFloat {
-        fn reflect(self, normal: T) -> T {
-            let scale: S = <S as From<f32>>::from(2.0) * self.dot(&normal).abs();
-            (self + normal * scale).normalize()
+        fn reflect(self, normal: &T) -> T {
+            let scale: S = <S as From<f32>>::from(2.0) * self.dot(normal).abs();
+            (self + normal.clone() * scale).normalize()
         }
     }
 }
 
 pub mod matrix_traits {
-    pub use nalgebra::{Mat3, Mat4, Inv, Eye, PerspMat3, Transpose, Row, Col, Diag};
+    pub use nalgebra::{
+        Col, Eye, Inv, Mat3, Mat4, PerspMat3, Rot3,
+        Rotation, Row, Transpose, Diag, Mat
+    };
+
+    use num::One;
+    use std::ops::Mul;
+
+    pub trait MatrixExtra<N, R, C>: Mat<N, R, C>
+        where C: Mul<Self, Output = R> {
+        fn from_row(nrow: usize, row: &R) -> Self;
+    }
+
+    impl<T, R, C, N> MatrixExtra<N, R, C> for T
+        where T: Mat<N, R, C> + One,
+              R: Clone,
+              C: Mul<T, Output=R> {
+        fn from_row(nrow: usize, row: &R) -> T {
+            let mut new = T::one();
+            new.set_row(nrow, row.clone());
+            new
+        }
+    }
 }
 
 use self::vector_traits::*;
 use self::matrix_traits::*;
+
+pub type Mat4f = Mat4<f32>;
+pub type Rot3f = Rot3<f32>;
+pub type Vec4f = Vec4<f32>;
+pub type Vec3f = Vec3<f32>;
+pub type Vec2f = Vec2<f32>;
+pub type Vec2u = Vec2<usize>;
 
 pub trait FloatExt {
     fn to_radian(self) -> Self;
@@ -50,7 +74,7 @@ pub fn vec3_from_value<T: BaseFloat>(val: T) -> Vec3<T> {
     Vec3::new(val, val, val)
 }
 
-pub fn extend_mat3_to_4<N: BaseNum>(m: &Mat3<N>) -> Mat4<N> {
+pub fn mat3_to_4<N: BaseNum>(m: &Mat3<N>) -> Mat4<N> {
     Mat4 {
         m11: m.m11,     m12: m.m12,     m13: m.m13,     m14: N::zero(),
         m21: m.m21,     m22: m.m22,     m23: m.m23,     m24: N::zero(),
@@ -59,10 +83,10 @@ pub fn extend_mat3_to_4<N: BaseNum>(m: &Mat3<N>) -> Mat4<N> {
     }
 }
 
-pub fn extend_vec3_to_4<N: BaseNum>(v: &Vec3<N>, aditional: N) -> Vec4<N> {
+pub fn vec3_to_4<N: BaseNum>(v: &Vec3<N>, aditional: N) -> Vec4<N> {
     Vec4::new(v.x, v.y, v.z, aditional)
 }
 
-pub fn shrink_vec4_to_3<N: BaseNum>(v: &Vec4<N>) -> Vec3<N> {
+pub fn vec4_to_3<N: BaseNum>(v: &Vec4<N>) -> Vec3<N> {
     Vec3::new(v.x, v.y, v.z)
 }

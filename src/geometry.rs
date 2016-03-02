@@ -2,14 +2,8 @@
 
 use math::vector_traits::*;
 use math::{Vec3f, vec3_from_value};
-use scene::{MaterialID, LightID};
+use scene::SurfaceProperties;
 // use std::{f32, f64};
-
-#[derive(Debug, Clone, Copy)]
-pub enum SurfaceProperties {
-    Material(MaterialID),
-    Light(LightID)
-}
 
 #[derive(Debug, Clone, Copy)]
 pub struct Intersection {

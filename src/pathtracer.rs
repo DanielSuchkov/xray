@@ -1,9 +1,9 @@
 #![allow(dead_code)]
-use render::Render;
+// use render::Render;
 use framebuffer::FrameBuffer;
 use scene::Scene;
-use geometry::{GeometryList};
-use math::{Vec3f, Vec2u};
+// use geometry::{GeometryList};
+// use math::{Vec3f, Vec2u};
 
 struct CpuPathTracer<T: Scene> {
     frame: FrameBuffer,
