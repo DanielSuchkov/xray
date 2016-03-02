@@ -1,5 +1,5 @@
 #![allow(dead_code)]
-use math::{Vec3f, Vec2u, Vector};
+use math::{Vec3f, Vec2u, vec3_from_value};
 
 #[derive(Debug, Clone)]
 pub struct FrameBuffer {
@@ -11,7 +11,7 @@ impl FrameBuffer {
     pub fn new(resolution: Vec2u) -> FrameBuffer {
         let n = resolution.x * resolution.y;
         FrameBuffer {
-            frame: (0..n).map(|_| Vec3f::from_value(0.0)).collect(),
+            frame: (0..n).map(|_| vec3_from_value(0.0)).collect(),
             resolution: resolution
         }
     }

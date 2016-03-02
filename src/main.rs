@@ -1,11 +1,17 @@
 extern crate sfml;
-extern crate cgmath;
+extern crate nalgebra;
+extern crate num;
+extern crate rand;
 
 pub mod math;
 pub mod geometry;
+pub mod render;
+pub mod pathtracer;
+pub mod transform;
 pub mod brdf;
 pub mod scene;
 pub mod framebuffer;
+pub mod camera;
 
 use sfml::graphics::{RenderWindow, Color, RenderTarget};
 use sfml::window::{VideoMode, ContextSettings, event, window_style};

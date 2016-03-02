@@ -5,4 +5,6 @@ authors = ["Daniel Suchkov <suc-daniil@yandex.ru>"]
 
 [dependencies]
 sfml = "0.10.1"
-cgmath = "0.7.0"
+nalgebra = "0.5.1"
+num = "0.1.31"
+rand = "0.3.14"
