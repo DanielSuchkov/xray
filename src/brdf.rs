@@ -1,5 +1,4 @@
 #![allow(dead_code)]
-
 use math::{Vec3f, ortho, vec3_from_value};
 use math::vector_traits::*;
 use std::f32;

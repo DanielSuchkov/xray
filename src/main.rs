@@ -3,26 +3,26 @@ extern crate nalgebra;
 extern crate num;
 extern crate rand;
 
-pub mod math;
-pub mod geometry;
-pub mod render;
-pub mod pathtracer;
 pub mod brdf;
-pub mod scene;
-pub mod light;
-pub mod framebuffer;
 pub mod camera;
+pub mod framebuffer;
+pub mod geometry;
+pub mod light;
+pub mod math;
+pub mod pathtracer;
+pub mod render;
+pub mod scene;
 
 use sfml::graphics::{RenderWindow, Color, RenderTarget};
 use sfml::window::{VideoMode, ContextSettings, event, window_style};
 
 use brdf::Material;
-use scene::{Scene, DefaultScene};
-use geometry::{GeometryList, Sphere};
-use math::{Vec3f, Vec2u};
-use render::{EyeLight, Render};
 use camera::{PerspectiveCamera, CameraBuilder, Camera};
 // use framebuffer::FrameBuffer;
+use geometry::{GeometryList, Sphere, Triangle};
+use math::{Vec3f, Vec2u};
+use render::{EyeLight, Render};
+use scene::Scene;
 
 fn f32_to_u8(f: f32) -> u8 {
     (f.min(1.0) * 255.0) as u8
@@ -45,7 +45,7 @@ fn main() {
 
     let cam = CameraBuilder::<PerspectiveCamera>::new()
         .with_view_size(res)
-        .with_pos(Vec3f::new(0.0, 0.0, -10.0))
+        .with_pos(Vec3f::new(0.0, 0.0, -8.6))
         .with_look_at(Vec3f::new(0.0, 0.0, 1.0))
         .with_up(Vec3f::new(0.0, 1.0, 0.0))
         .with_fov(45.0)
@@ -53,10 +53,46 @@ fn main() {
         .with_zfar(10000.0)
         .build();
 
+
     scene.add_object(
-        Sphere { center: Vec3f::new(-1.0, 0.0, 1.0), radius: 0.8 },
+        Sphere { center: Vec3f::new(0.8, -1.5, 0.0), radius: 0.8 },
         Material::new_identity()
     );
+    scene.add_object(
+        Sphere { center: Vec3f::new(-0.8, -1.5, 0.2), radius: 0.6 },
+        Material::new_identity()
+    );
+
+    let cb = [
+        Vec3f::new(-2.5,  2.5, -2.5), /*0*/
+        Vec3f::new( 2.5,  2.5, -2.5), /*1*/
+        Vec3f::new( 2.5,  2.5,  2.5), /*2*/
+        Vec3f::new(-2.5,  2.5,  2.5), /*3*/
+        Vec3f::new(-2.5, -2.5, -2.5), /*4*/
+        Vec3f::new( 2.5, -2.5, -2.5), /*5*/
+        Vec3f::new( 2.5, -2.5,  2.5), /*6*/
+        Vec3f::new(-2.5, -2.5,  2.5)  /*7*/
+    ];
+
+    // floor
+    scene.add_object(Triangle::new(cb[7], cb[4], cb[5]), Material::new_identity());
+    scene.add_object(Triangle::new(cb[5], cb[6], cb[7]), Material::new_identity());
+
+    // ceiling
+    scene.add_object(Triangle::new(cb[0], cb[1], cb[2]), Material::new_identity());
+    scene.add_object(Triangle::new(cb[2], cb[3], cb[0]), Material::new_identity());
+
+    // back wall
+    scene.add_object(Triangle::new(cb[2], cb[6], cb[7]), Material::new_identity());
+    scene.add_object(Triangle::new(cb[7], cb[3], cb[2]), Material::new_identity());
+
+    // left wall
+    scene.add_object(Triangle::new(cb[3], cb[7], cb[4]), Material::new_identity());
+    scene.add_object(Triangle::new(cb[4], cb[0], cb[3]), Material::new_identity());
+
+    // right wall
+    scene.add_object(Triangle::new(cb[1], cb[5], cb[6]), Material::new_identity());
+    scene.add_object(Triangle::new(cb[6], cb[2], cb[1]), Material::new_identity());
 
     let mut ren = EyeLight::new(cam, scene);
     let mut iter_nb = 0;

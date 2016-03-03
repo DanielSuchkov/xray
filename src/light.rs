@@ -1,5 +1,5 @@
 #![allow(dead_code)]
-use math::{Vec3f, Vec2f};
+use math::{Vec2f, Vec3f};
 // use math::vector_traits::*;
 use geometry::BSphere;
 

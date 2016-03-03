@@ -1,7 +1,4 @@
-use std;
-use std::ops::{Div, Mul};
-
-pub use nalgebra::{BaseNum};
+pub use nalgebra::BaseNum;
 
 pub mod vector_traits {
     pub use nalgebra::{Absolute, BaseFloat, Cross, Dot, FloatVec, Norm, Vec2, Vec3, Vec4};
@@ -55,16 +52,6 @@ pub type Vec4f = Vec4<f32>;
 pub type Vec3f = Vec3<f32>;
 pub type Vec2f = Vec2<f32>;
 pub type Vec2u = Vec2<usize>;
-
-pub trait FloatExt {
-    fn to_radian(self) -> Self;
-}
-
-impl<T> FloatExt for T where T: Div<Output=T> + Mul<Output=T> + From<f32> {
-    fn to_radian(self) -> T {
-        self * From::from(std::f32::consts::PI / 180.0)
-    }
-}
 
 pub fn mix(a: f32, b: f32, mix: f32) -> f32 {
     b * mix + a * (1.0 - mix)

@@ -1,12 +1,11 @@
 #![allow(dead_code)]
-
-use rand::{Rng, StdRng};
-use framebuffer::FrameBuffer;
-use scene::Scene;
 use camera::PerspectiveCamera;
+use framebuffer::FrameBuffer;
 use geometry::GeometryManager;
-use math::{Vec2u, Vec2f, vec3_from_value};
 use math::vector_traits::*;
+use math::{Vec2u, Vec2f, vec3_from_value};
+use rand::{Rng, StdRng};
+use scene::Scene;
 
 pub trait Render<S: Scene> {
     fn new(cam: PerspectiveCamera, scene: S) -> Self;
@@ -49,9 +48,9 @@ impl<S> Render<S> for EyeLight<S> where S: Scene {
 
                 if let Some(isect) = self.scene.nearest_intersection(&ray) {
                     let l_dot_n = isect.normal.dot(&-ray.dir);
-                    if l_dot_n > 0.0 {
-                        self.frame.add_color(Vec2u::new(x, y), vec3_from_value(l_dot_n));
-                    }
+                    self.frame.add_color(
+                        Vec2u::new(x, y), vec3_from_value(l_dot_n.max(-l_dot_n))
+                    );
                 } else {
                     self.frame.add_color(Vec2u::new(x, y), vec3_from_value(0.5));
                 }

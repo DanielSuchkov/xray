@@ -1,5 +1,4 @@
 #![allow(dead_code)]
-
 use math::vector_traits::*;
 use math::{Vec3f, vec3_from_value, ortho};
 use scene::SurfaceProperties;
@@ -77,7 +76,7 @@ pub trait GeometrySurface {
 pub trait GeometryManager {
     fn new() -> Self;
     fn nearest_intersection(&self, ray: &Ray) -> Option<SurfaceIntersection>;
-    fn add_geometry<GS>(&mut self, object: GS) where GS: GeometrySurface + 'static;
+    fn add_geometry<G>(&mut self, object: G) where G: GeometrySurface + 'static;
     fn build_aabbox(&self) -> AABBox;
 }
 
@@ -172,6 +171,15 @@ impl Geometry for Sphere {
     }
 }
 
+impl Triangle {
+    pub fn new(p0: Vec3f, p1: Vec3f, p2: Vec3f) -> Triangle {
+        Triangle {
+            vert: [p0, p1, p2],
+            normal: (p1 - p0).cross(&(p2 - p0)).normalize()
+        }
+    }
+}
+
 impl Geometry for Triangle {
     fn intersect(&self, ray: &Ray) -> Option<Intersection> {
         let ao = self.vert[0] - ray.orig;
@@ -186,7 +194,7 @@ impl Geometry for Triangle {
         let v1d = v1.dot(&ray.dir);
         let v2d = v2.dot(&ray.dir);
 
-        if ((v0d < 0.0)  && (v1d < 0.0)  && (v2d < 0.0)) ||
+        if ((v0d <= 0.0)  && (v1d <= 0.0)  && (v2d <= 0.0)) ||
            ((v0d >= 0.0) && (v1d >= 0.0) && (v2d >= 0.0)) {
             Some(Intersection {
                 normal: self.normal,
@@ -220,15 +228,13 @@ impl GeometryManager for GeometryList {
         self.geometries.iter()
             .map(|ref g| g.intersect(&ray))
             .fold(None, |curr, isect|
-                if let Some(cur) = curr {
-                    isect.map(|isec| if isec.dist < cur.dist { isec } else { cur })
-                } else {
-                    isect
-                }
+                curr.map_or(isect, |ref cur|
+                    isect.map_or(curr, |ref isec| if isec.dist < cur.dist { isect } else { curr })
+                )
             )
     }
 
-    fn add_geometry<GS>(&mut self, object: GS) where GS: GeometrySurface + 'static {
+    fn add_geometry<G>(&mut self, object: G) where G: GeometrySurface + 'static {
         self.geometries.push(Box::new(object));
     }
 

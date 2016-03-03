@@ -1,10 +1,9 @@
 #![allow(dead_code)]
-
-use math;
-use math::{Vec3f, Vec4f, Mat4f, Vec2f, Vec2u, FloatExt, Rot3f};
+use geometry::Ray;
 use math::matrix_traits::*;
 use math::vector_traits::*;
-use geometry::Ray;
+use math::{Mat4f, Rot3f, Vec2f, Vec2u, Vec3f, Vec4f};
+use math;
 use std::marker::PhantomData;
 
 #[derive(Clone, Debug)]
@@ -23,9 +22,10 @@ pub struct CameraBuilder<T: Camera> {
 pub struct PerspectiveCamera {
     projection: PerspMat3<f32>,
     view_size: Vec2f,
-    translation: Mat4f,
+    // translation: Mat4f,
+    position: Vec3f,
     rotation: Rot3f,
-    world2raster: Mat4f,
+    // world2raster: Mat4f,
     raster2world: Mat4f,
 }
 
@@ -90,10 +90,10 @@ impl<T> CameraBuilder<T> where T: Camera {
 impl Camera for PerspectiveCamera {
     fn new(pos: Vec3f, at: Vec3f, up: Vec3f, view_size: Vec2f, fov: f32, near: f32, far: f32)
         -> PerspectiveCamera {
-        let proj = PerspMat3::new(view_size.x / view_size.y, fov.to_radian(), -near, -far);
-        let proj_mat = proj.to_mat().transpose() * -1.0;
+        let proj = PerspMat3::new(view_size.x / view_size.y, fov.to_radians(), near, far);
+        let proj_mat = proj.to_mat().transpose();
         let transl: Mat4f = Mat4f::from_row(3, &math::vec3_to_4(&-pos, 1.0));
-        let rot = Rot3::look_at_z(&-at.normalize(), &up.normalize());
+        let rot = Rot3::look_at_z(&at.normalize(), &-up.normalize());
         let world2cam = transl * math::mat3_to_4(&rot.submat());
         let world2screen = world2cam * proj_mat;
         let screen2world = world2screen.inv().expect("cant calc w2s inversion :(");
@@ -102,15 +102,15 @@ impl Camera for PerspectiveCamera {
             * one_px_move;
         let raster2world = raster2screen * screen2world;
 
-        let world2raster = world2screen * one_px_move
-            * Mat4f::from_diag(&Vec4f::new(0.5 * view_size.x, 0.5 * view_size.y, 0.0, 1.0));
+        // let world2raster = world2screen * one_px_move
+        //     * Mat4f::from_diag(&Vec4f::new(0.5 * view_size.x, 0.5 * view_size.y, 0.0, 1.0));
 
         PerspectiveCamera {
             projection: proj,
-            translation: transl,
+            position: pos,
             rotation: rot,
             raster2world: raster2world,
-            world2raster: world2raster,
+            // world2raster: world2raster,
             view_size: view_size,
         }
     }
@@ -118,7 +118,7 @@ impl Camera for PerspectiveCamera {
 
 impl PerspectiveCamera {
     pub fn set_fov(&mut self, deg_angle: f32) -> &mut PerspectiveCamera {
-        self.projection.set_fov(deg_angle.to_radian());
+        self.projection.set_fov(deg_angle.to_radians());
         self.recache_world_mat();
         self
     }
@@ -159,7 +159,7 @@ impl PerspectiveCamera {
     // }
 
     pub fn set_position(&mut self, pos: &Vec3f) -> &mut PerspectiveCamera {
-        self.translation.set_row(3, math::vec3_to_4(&-*pos, 1.0));
+        self.position = *pos;
         self.recache_world_mat();
         self
     }
@@ -204,20 +204,20 @@ impl PerspectiveCamera {
         self
     }
 
-    pub fn get_world2raster_mat(&self) -> &Mat4f {
-        &self.world2raster
-    }
+    // pub fn get_world2raster_mat(&self) -> &Mat4f {
+    //     &self.world2raster
+    // }
 
     pub fn get_raster2world_mat(&self) -> &Mat4f {
         &self.raster2world
     }
 
-    pub fn apply_world2raster(&self, vec: &Vec3f) -> Vec3f {
-        math::vec4_to_3(&(self.world2raster * math::vec3_to_4(vec, 1.0)))
-    }
+    // pub fn apply_world2raster(&self, vec: &Vec3f) -> Vec3f {
+    //     math::vec4_to_3(&(self.world2raster * math::vec3_to_4(vec, 1.0)))
+    // }
 
     pub fn get_position(&self) -> Vec3f {
-        -math::vec4_to_3(&self.translation.row(3))
+        self.position
     }
 
     pub fn get_view_size(&self) -> Vec2f {
@@ -260,7 +260,6 @@ impl PerspectiveCamera {
 
 mod tests {
     #![cfg_attr(not(test), allow(unused_imports))]
-
     use super::{PerspectiveCamera, CameraBuilder};
     use math::{Vec2u, Vec3f, Vec2f};
     use geometry::Ray;
@@ -268,7 +267,7 @@ mod tests {
 
     fn test_camera() -> PerspectiveCamera {
         let res = Vec2u::new(800, 600);
-        CameraBuilder::<PerspectiveCamera>::new()
+        CameraBuilder::new()
             .with_view_size(res.clone())
             .with_pos(Vec3f::new(-0.0439815, -4.12529, 0.222539))
             .with_look_at(Vec3f::new(0.00688625, 0.998505, -0.0542161))
@@ -285,7 +284,7 @@ mod tests {
         let Ray {orig, dir} = cam.ray_from_screen(&Vec2f::new(0 as f32, 0 as f32));
         println!("{:?} | {:?}", orig, dir);
         assert!(orig.approx_eq(&Vec3f::new(-0.0439815, -4.12529, 0.222539)));
-        assert!(dir.approx_eq(&Vec3f::new( -0.4486941, 0.8433279, 0.29575622)));
+        assert!(dir.approx_eq(&Vec3f { x: 0.4602826, y: 0.8370593, z: 0.29575595 }));
     }
 
     #[test]
@@ -294,7 +293,7 @@ mod tests {
         let Ray {orig, dir} = cam.ray_from_screen(&Vec2f::new(15 as f32, 19 as f32));
         println!("{:?} | {:?}", orig, dir);
         assert!(orig.approx_eq(&Vec3f::new(-0.0439815, -4.12529, 0.222539)));
-        assert!(dir.approx_eq(&Vec3f::new(-0.43816033, 0.85472125, 0.27832913)));
+        assert!(dir.approx_eq(&Vec3f { x: 0.44990647, y: 0.8485973, z: 0.27832857 }));
     }
 
     #[test]
@@ -303,7 +302,7 @@ mod tests {
         let Ray {orig, dir} = cam.ray_from_screen(&Vec2f::new(490 as f32, 580 as f32));
         println!("{:?} | {:?}", orig, dir);
         assert!(orig.approx_eq(&Vec3f::new(-0.0439815, -4.12529, 0.222539)));
-        assert!(dir.approx_eq(&Vec3f::new(0.121376984, 0.9049234, -0.40789852)));
+        assert!(dir.approx_eq(&Vec3f { x: -0.108884126, y: 0.90651166, z: -0.407898 }));
     }
 
     #[test]
@@ -312,6 +311,6 @@ mod tests {
         let Ray {orig, dir} = cam.ray_from_screen(&Vec2f::new(800 as f32, 600 as f32));
         println!("{:?} | {:?}", orig, dir);
         assert!(orig.approx_eq(&Vec3f::new(-0.0439815, -4.12529, 0.222539)));
-        assert!(dir.approx_eq(&Vec3f::new(0.46002784, 0.8000982, -0.3849899)));
+        assert!(dir.approx_eq(&Vec3f { x: -0.44894803, y: 0.8063677, z: -0.3849893 }));
     }
 }

@@ -1,9 +1,8 @@
 #![allow(dead_code)]
-
-use geometry::{GeometryManager, Ray, SurfaceIntersection, Geometry, BSphere, Surface};
-use math::vector_traits::*;
 use brdf::Material;
+use geometry::{BSphere, Geometry, GeometryManager, Ray, Surface, SurfaceIntersection};
 // use light::Light;
+use math::vector_traits::*;
 
 pub type MaterialID = i32;
 pub type LightID = i32;
@@ -26,6 +25,7 @@ pub trait Scene {
     fn nearest_intersection(&self, ray: &Ray) -> Option<SurfaceIntersection>;
     fn add_object<G>(&mut self, geo: G, material: Material) where G: Geometry + 'static;
     fn bounding_sphere(&self) -> BSphere;
+    fn get_material(&self, m_id: MaterialID) -> &Material;
 }
 
 impl<T> Scene for DefaultScene<T> where T: GeometryManager {
@@ -59,5 +59,9 @@ impl<T> Scene for DefaultScene<T> where T: GeometryManager {
             radius: radius2.sqrt(),
             inv_radius_sqr: 1.0 / radius2
         }
+    }
+
+    fn get_material(&self, m_id: MaterialID) -> &Material {
+        &self.materials[m_id as usize]
     }
 }
