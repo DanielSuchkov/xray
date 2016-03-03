@@ -4,6 +4,7 @@ use math;
 use math::{Vec3f, Vec4f, Mat4f, Vec2f, Vec2u, FloatExt, Rot3f};
 use math::matrix_traits::*;
 use math::vector_traits::*;
+use geometry::Ray;
 use std::marker::PhantomData;
 
 #[derive(Clone, Debug)]
@@ -89,7 +90,7 @@ impl<T> CameraBuilder<T> where T: Camera {
 impl Camera for PerspectiveCamera {
     fn new(pos: Vec3f, at: Vec3f, up: Vec3f, view_size: Vec2f, fov: f32, near: f32, far: f32)
         -> PerspectiveCamera {
-        let proj = PerspMat3::new(1.0, fov.to_radian(), -near, -far);
+        let proj = PerspMat3::new(view_size.x / view_size.y, fov.to_radian(), -near, -far);
         let proj_mat = proj.to_mat().transpose() * -1.0;
         let transl: Mat4f = Mat4f::from_row(3, &math::vec3_to_4(&-pos, 1.0));
         let rot = Rot3::look_at_z(&-at.normalize(), &up.normalize());
@@ -229,11 +230,11 @@ impl PerspectiveCamera {
         // math::vec4_to_3(&v) * (1.0 / v.w)
     }
 
-    pub fn ray_from_screen(&self, coord: &Vec2f) -> (Vec3f, Vec3f) {
+    pub fn ray_from_screen(&self, coord: &Vec2f) -> Ray {
         let pos = self.get_position();
         let world_raster = self.apply_raster2world(&Vec3f::new(coord.x, coord.y, 0.0));
         let dir = (world_raster - pos).normalize();
-        (pos, dir)
+        Ray { orig: pos, dir: dir }
     }
 
     pub fn add_position(&mut self, pos: &Vec3f) {
@@ -262,6 +263,7 @@ mod tests {
 
     use super::{PerspectiveCamera, CameraBuilder};
     use math::{Vec2u, Vec3f, Vec2f};
+    use geometry::Ray;
     use nalgebra::ApproxEq;
 
     fn test_camera() -> PerspectiveCamera {
@@ -280,36 +282,36 @@ mod tests {
     #[test]
     fn ray_to_world_0_0() {
         let cam = test_camera();
-        let (orig, dir) = cam.ray_from_screen(&Vec2f::new(0 as f32, 0 as f32));
+        let Ray {orig, dir} = cam.ray_from_screen(&Vec2f::new(0 as f32, 0 as f32));
         println!("{:?} | {:?}", orig, dir);
         assert!(orig.approx_eq(&Vec3f::new(-0.0439815, -4.12529, 0.222539)));
-        assert!(dir.approx_eq(&Vec3f::new(-0.35132286, 0.8834082, 0.31010032)));
+        assert!(dir.approx_eq(&Vec3f::new( -0.4486941, 0.8433279, 0.29575622)));
     }
 
     #[test]
     fn ray_to_world_15_19() {
         let cam = test_camera();
-        let (orig, dir) = cam.ray_from_screen(&Vec2f::new(15 as f32, 19 as f32));
+        let Ray {orig, dir} = cam.ray_from_screen(&Vec2f::new(15 as f32, 19 as f32));
         println!("{:?} | {:?}", orig, dir);
         assert!(orig.approx_eq(&Vec3f::new(-0.0439815, -4.12529, 0.222539)));
-        assert!(dir.approx_eq(&Vec3f::new( -0.342246, 0.893357, 0.291171)));
+        assert!(dir.approx_eq(&Vec3f::new(-0.43816033, 0.85472125, 0.27832913)));
     }
 
     #[test]
     fn ray_to_world_490_580() {
         let cam = test_camera();
-        let (orig, dir) = cam.ray_from_screen(&Vec2f::new(490 as f32, 580 as f32));
+        let Ray {orig, dir} = cam.ray_from_screen(&Vec2f::new(490 as f32, 580 as f32));
         println!("{:?} | {:?}", orig, dir);
         assert!(orig.approx_eq(&Vec3f::new(-0.0439815, -4.12529, 0.222539)));
-        assert!(dir.approx_eq(&Vec3f::new(0.092864, 0.907758, -0.409086)));
+        assert!(dir.approx_eq(&Vec3f::new(0.121376984, 0.9049234, -0.40789852)));
     }
 
     #[test]
     fn ray_to_world_800_600() {
         let cam = test_camera();
-        let (orig, dir) = cam.ray_from_screen(&Vec2f::new(800 as f32, 600 as f32));
+        let Ray {orig, dir} = cam.ray_from_screen(&Vec2f::new(800 as f32, 600 as f32));
         println!("{:?} | {:?}", orig, dir);
         assert!(orig.approx_eq(&Vec3f::new(-0.0439815, -4.12529, 0.222539)));
-        assert!(dir.approx_eq(&Vec3f::new(0.363206, 0.839725, -0.403661)));
+        assert!(dir.approx_eq(&Vec3f::new(0.46002784, 0.8000982, -0.3849899)));
     }
 }

@@ -90,3 +90,12 @@ pub fn vec3_to_4<N: BaseNum>(v: &Vec3<N>, aditional: N) -> Vec4<N> {
 pub fn vec4_to_3<N: BaseNum>(v: &Vec4<N>) -> Vec3<N> {
     Vec3::new(v.x, v.y, v.z)
 }
+
+pub fn ortho(v: &Vec3f) -> Vec3f {
+    // http://lolengine.net/blog/2013/09/21/picking-orthogonal-vector-combing-coconuts
+    if v.x.abs() > v.z.abs() {
+        Vec3f::new(-v.y, v.x, 0.0)
+    } else {
+        Vec3f::new(0.0, -v.z, v.y)
+    }
+}

@@ -1,20 +1,25 @@
 #![allow(dead_code)]
 
-use math::Vec3f;
+use math::{Vec3f, ortho, vec3_from_value};
 use math::vector_traits::*;
 use std::f32;
 
+#[derive(Debug, Clone, PartialEq)]
 pub struct Material {
     pub diffuse: Vec3f,
     pub specular: Vec3f,
     pub phong_exponent: f32
 }
 
-fn luminance(a_rgb: &Vec3f) -> f32 {
-    0.212671 * a_rgb.x + 0.715160 * a_rgb.y + 0.072169 * a_rgb.z
-}
-
 impl Material {
+    pub fn new_identity() -> Material {
+        Material {
+            diffuse: vec3_from_value(0.0),
+            specular: vec3_from_value(0.0),
+            phong_exponent: 0.0
+        }
+    }
+
     fn albedo_diffuse(&self) -> f32 {
         luminance(&self.diffuse)
     }
@@ -28,13 +33,8 @@ impl Material {
     }
 }
 
-fn ortho(v: &Vec3f) -> Vec3f {
-    // http://lolengine.net/blog/2013/09/21/picking-orthogonal-vector-combing-coconuts
-    if v.x.abs() > v.z.abs() {
-        Vec3f::new(-v.y, v.x, 0.0)
-    } else {
-        Vec3f::new(0.0, -v.z, v.y)
-    }
+fn luminance(a_rgb: &Vec3f) -> f32 {
+    0.212671 * a_rgb.x + 0.715160 * a_rgb.y + 0.072169 * a_rgb.z
 }
 
 fn get_cosine_lambert_sample(normal: Vec3f, rnd: (f32, f32)) -> Vec3f {

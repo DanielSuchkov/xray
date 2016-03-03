@@ -1,21 +1,38 @@
 #![allow(dead_code)]
 
 use math::vector_traits::*;
-use math::{Vec3f, vec3_from_value};
+use math::{Vec3f, vec3_from_value, ortho};
 use scene::SurfaceProperties;
-// use std::{f32, f64};
+use std::f32;
 
 #[derive(Debug, Clone, Copy)]
-pub struct Intersection {
+pub struct SurfaceIntersection {
     pub normal: Vec3f, // normal at intersection point
     pub dist: f32, // distance to nearest intersection point
     pub surface: SurfaceProperties,
 }
 
+pub struct Intersection {
+    pub normal: Vec3f, // normal at intersection point
+    pub dist: f32, // distance to nearest intersection point
+}
+
+pub struct Surface<G: Geometry + 'static> {
+    pub geometry: G,
+    pub properties: SurfaceProperties,
+}
+
 #[derive(Debug, Clone, Copy)]
 pub struct AABBox {
-    min: Vec3f,
-    max: Vec3f,
+    pub min: Vec3f,
+    pub max: Vec3f,
+}
+
+#[derive(Debug, Clone, Copy)]
+pub struct BSphere {
+    pub center: Vec3f,
+    pub radius: f32,
+    pub inv_radius_sqr: f32, // 1.0/(r^2)
 }
 
 #[derive(Debug, Clone, Copy)]
@@ -28,18 +45,23 @@ pub struct Ray {
 pub struct Sphere {
     pub center: Vec3f,
     pub radius: f32,
-    pub surface: SurfaceProperties,
 }
 
 #[derive(Debug, Clone)]
 pub struct Triangle {
     pub vert: [Vec3f; 3],
     pub normal: Vec3f,
-    pub surface: SurfaceProperties,
+}
+
+#[derive(Debug, Clone)]
+pub struct Frame {
+    ox: Vec3f,
+    oy: Vec3f,
+    oz: Vec3f,
 }
 
 pub struct GeometryList {
-    geometries: Vec<Box<Geometry>>
+    geometries: Vec<Box<GeometrySurface>>
 }
 
 pub trait Geometry {
@@ -47,15 +69,59 @@ pub trait Geometry {
     fn build_aabbox(&self) -> AABBox;
 }
 
+pub trait GeometrySurface {
+    fn intersect(&self, ray: &Ray) -> Option<SurfaceIntersection>;
+    fn build_aabbox(&self) -> AABBox;
+}
+
 pub trait GeometryManager {
     fn new() -> Self;
-    fn nearest_intersection(&self, ray: &Ray) -> Option<Intersection>;
-    fn add_geometry<T>(&mut self, object: T) where T: Geometry + 'static;
+    fn nearest_intersection(&self, ray: &Ray) -> Option<SurfaceIntersection>;
+    fn add_geometry<GS>(&mut self, object: GS) where GS: GeometrySurface + 'static;
+    fn build_aabbox(&self) -> AABBox;
+}
+
+impl<G> GeometrySurface for Surface<G> where G: Geometry {
+    fn intersect(&self, ray: &Ray) -> Option<SurfaceIntersection> {
+        self.geometry.intersect(ray).map(|isect| SurfaceIntersection {
+            normal: isect.normal,
+            dist: isect.dist,
+            surface: self.properties,
+        })
+    }
+
+    fn build_aabbox(&self) -> AABBox {
+        self.geometry.build_aabbox()
+    }
 }
 
 impl Sphere {
     pub fn r2(&self) -> f32 {
         self.radius * self.radius
+    }
+}
+
+impl AABBox {
+    fn new_infinity() -> AABBox {
+        AABBox {
+            min: vec3_from_value(f32::INFINITY),
+            max: vec3_from_value(f32::NEG_INFINITY),
+        }
+    }
+
+    fn grow_mut(&mut self, other: &AABBox) {
+        self.min.x = self.min.x.min(other.min.x);
+        self.min.y = self.min.y.min(other.min.y);
+        self.min.z = self.min.z.min(other.min.z);
+        self.max.x = self.max.x.max(other.max.x);
+        self.max.y = self.max.y.max(other.max.y);
+        self.max.z = self.max.z.max(other.max.z);
+    }
+
+    fn grow(&self, other: &AABBox) -> AABBox {
+        let mut aabb = other.clone();
+        aabb.grow_mut(self);
+        aabb
     }
 }
 
@@ -95,7 +161,6 @@ impl Geometry for Sphere {
         Some(Intersection {
             normal: (local_origin + vec3_from_value(res_t) * ray.dir).normalize(),
             dist: res_t,
-            surface: self.surface
         })
     }
 
@@ -126,7 +191,6 @@ impl Geometry for Triangle {
             Some(Intersection {
                 normal: self.normal,
                 dist: self.normal.dot(&ao) / self.normal.dot(&ray.dir),
-                surface: self.surface,
             })
         } else {
             None
@@ -141,7 +205,6 @@ impl Geometry for Triangle {
                 max[i] = max[i].max(v[i]);
             }
         }
-
         AABBox { min: min, max: max }
     }
 }
@@ -153,7 +216,7 @@ impl GeometryManager for GeometryList {
         }
     }
 
-    fn nearest_intersection(&self, ray: &Ray) -> Option<Intersection> {
+    fn nearest_intersection(&self, ray: &Ray) -> Option<SurfaceIntersection> {
         self.geometries.iter()
             .map(|ref g| g.intersect(&ray))
             .fold(None, |curr, isect|
@@ -165,8 +228,61 @@ impl GeometryManager for GeometryList {
             )
     }
 
-    fn add_geometry<T>(&mut self, object: T)
-        where T: Geometry + 'static {
+    fn add_geometry<GS>(&mut self, object: GS) where GS: GeometrySurface + 'static {
         self.geometries.push(Box::new(object));
+    }
+
+    fn build_aabbox(&self) -> AABBox {
+        let mut aabb = AABBox::new_infinity();
+        for geo in self.geometries.iter() {
+            aabb.grow_mut(&geo.build_aabbox());
+        }
+        aabb
+    }
+}
+
+impl Frame {
+    fn new(ox: Vec3f, oy: Vec3f, oz: Vec3f) -> Frame {
+        Frame { ox: ox, oy: oy, oz: oz }
+    }
+
+    fn new_identity() -> Frame {
+        Frame {
+            ox: Vec3f::new(1.0, 0.0, 0.0),
+            oy: Vec3f::new(0.0, 1.0, 0.0),
+            oz: Vec3f::new(0.0, 0.0, 1.0),
+        }
+    }
+
+    fn new_from_z(oz: Vec3f) -> Frame {
+        let oz = oz.normalize();
+        let temp_ox = ortho(&oz);
+        let oy = oz.cross(&temp_ox).normalize();
+        let ox = oy.cross(&oz);
+        Frame { ox: ox, oy: oy, oz: oz }
+    }
+
+    fn normal(&self) -> Vec3f {
+        self.oz
+    }
+
+    fn tangent(&self) -> Vec3f {
+        self.oy
+    }
+
+    fn binormal(&self) -> Vec3f {
+        self.ox
+    }
+
+    fn to_world(&self, v: &Vec3f) -> Vec3f {
+        self.ox * v.x + self.oy * v.y + self.oz * v.z
+    }
+
+    fn to_local(&self, v: &Vec3f) -> Vec3f {
+        Vec3f {
+            x: v.dot(&self.ox),
+            y: v.dot(&self.oy),
+            z: v.dot(&self.oz),
+        }
     }
 }

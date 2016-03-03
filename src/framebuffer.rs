@@ -18,10 +18,17 @@ impl FrameBuffer {
 
     pub fn add_color(&mut self, coords: Vec2u, color: Vec3f) {
         let idx = self.idx(coords);
+        assert!(idx != self.resolution.x * self.resolution.y);
         self.frame[idx] = self.frame[idx] + color;
     }
 
-    fn idx(&self, coords: Vec2u) -> usize {
+    pub fn set_color(&mut self, coords: Vec2u, color: Vec3f) {
+        let idx = self.idx(coords);
+        assert!(idx != self.resolution.x * self.resolution.y);
+        self.frame[idx] = color;
+    }
+
+    pub fn idx(&self, coords: Vec2u) -> usize {
         coords.x + coords.y * self.resolution.x
     }
 
