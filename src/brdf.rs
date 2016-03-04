@@ -3,7 +3,7 @@ use math::{Vec3f, ortho, vec3_from_value};
 use math::vector_traits::*;
 use std::f32;
 
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Clone, PartialEq, Copy)]
 pub struct Material {
     pub diffuse: Vec3f,
     pub specular: Vec3f,

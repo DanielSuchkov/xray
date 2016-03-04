@@ -13,14 +13,13 @@ pub mod pathtracer;
 pub mod render;
 pub mod scene;
 
-use sfml::graphics::{RenderWindow, Color, RenderTarget};
+use sfml::graphics::{RenderWindow, Color, RenderTarget, Texture, Sprite};
 use sfml::window::{VideoMode, ContextSettings, event, window_style};
 
 use brdf::Material;
 use camera::{PerspectiveCamera, CameraBuilder, Camera};
-// use framebuffer::FrameBuffer;
 use geometry::{GeometryList, Sphere, Triangle};
-use math::{Vec3f, Vec2u};
+use math::{Vec3f, Vec2u, vec3_from_value};
 use render::{EyeLight, Render};
 use scene::Scene;
 
@@ -28,9 +27,9 @@ fn f32_to_u8(f: f32) -> u8 {
     (f.min(1.0) * 255.0) as u8
 }
 
-fn vec3f_to_color(v: Vec3f) -> Color {
-    Color::new_rgb(f32_to_u8(v.x), f32_to_u8(v.y), f32_to_u8(v.z))
-}
+// fn vec3f_to_color(v: Vec3f) -> Color {
+//     Color::new_rgb(f32_to_u8(v.x), f32_to_u8(v.y), f32_to_u8(v.z))
+// }
 
 fn main() {
     let res = Vec2u::new(800, 600);
@@ -54,51 +53,75 @@ fn main() {
         .build();
 
 
-    scene.add_object(
-        Sphere { center: Vec3f::new(0.8, -1.5, 0.0), radius: 0.8 },
-        Material::new_identity()
-    );
-    scene.add_object(
-        Sphere { center: Vec3f::new(-0.8, -1.5, 0.2), radius: 0.6 },
-        Material::new_identity()
-    );
+    let white_diffuse = Material {
+        diffuse: vec3_from_value(0.8),
+        specular: vec3_from_value(0.0),
+        phong_exponent: 1.0
+    };
+
+    let green_diffuse = Material {
+        diffuse: Vec3f::new(0.156863, 0.803922, 0.172549),
+        specular: vec3_from_value(0.0),
+        phong_exponent: 1.0
+    };
+
+    let red_diffuse = Material {
+        diffuse: Vec3f::new(0.803922, 0.152941, 0.152941),
+        specular: vec3_from_value(0.0),
+        phong_exponent: 1.0
+    };
+
+    let blue_diffuse = Material {
+        diffuse: Vec3f::new(0.1, 0.9, 0.9),
+        specular: vec3_from_value(0.1),
+        phong_exponent: 1.0
+    };
+
+    let dark_mirror = Material {
+        diffuse: vec3_from_value(0.1),
+        specular: vec3_from_value(1.0),
+        phong_exponent: 4000000.0
+    };
+
+    scene.add_object(Sphere { center: Vec3f::new(0.8, -1.5, 0.0), radius: 0.8 }, blue_diffuse);
+    scene.add_object(Sphere { center: Vec3f::new(-0.8, -1.5, 0.2), radius: 0.6 }, dark_mirror);
 
     let cb = [
-        Vec3f::new(-2.5,  2.5, -2.5), /*0*/
-        Vec3f::new( 2.5,  2.5, -2.5), /*1*/
-        Vec3f::new( 2.5,  2.5,  2.5), /*2*/
-        Vec3f::new(-2.5,  2.5,  2.5), /*3*/
-        Vec3f::new(-2.5, -2.5, -2.5), /*4*/
-        Vec3f::new( 2.5, -2.5, -2.5), /*5*/
-        Vec3f::new( 2.5, -2.5,  2.5), /*6*/
-        Vec3f::new(-2.5, -2.5,  2.5)  /*7*/
+        Vec3f::new(-2.5,  2.5, -2.5), // 0
+        Vec3f::new( 2.5,  2.5, -2.5), // 1
+        Vec3f::new( 2.5,  2.5,  2.5), // 2
+        Vec3f::new(-2.5,  2.5,  2.5), // 3
+        Vec3f::new(-2.5, -2.5, -2.5), // 4
+        Vec3f::new( 2.5, -2.5, -2.5), // 5
+        Vec3f::new( 2.5, -2.5,  2.5), // 6
+        Vec3f::new(-2.5, -2.5,  2.5)  // 7
     ];
 
     // floor
-    scene.add_object(Triangle::new(cb[7], cb[4], cb[5]), Material::new_identity());
-    scene.add_object(Triangle::new(cb[5], cb[6], cb[7]), Material::new_identity());
+    scene.add_object(Triangle::new(cb[7], cb[4], cb[5]), white_diffuse);
+    scene.add_object(Triangle::new(cb[5], cb[6], cb[7]), white_diffuse);
 
     // ceiling
-    scene.add_object(Triangle::new(cb[0], cb[1], cb[2]), Material::new_identity());
-    scene.add_object(Triangle::new(cb[2], cb[3], cb[0]), Material::new_identity());
+    scene.add_object(Triangle::new(cb[0], cb[1], cb[2]), white_diffuse);
+    scene.add_object(Triangle::new(cb[2], cb[3], cb[0]), white_diffuse);
 
     // back wall
-    scene.add_object(Triangle::new(cb[2], cb[6], cb[7]), Material::new_identity());
-    scene.add_object(Triangle::new(cb[7], cb[3], cb[2]), Material::new_identity());
+    scene.add_object(Triangle::new(cb[2], cb[6], cb[7]), white_diffuse);
+    scene.add_object(Triangle::new(cb[7], cb[3], cb[2]), white_diffuse);
 
     // left wall
-    scene.add_object(Triangle::new(cb[3], cb[7], cb[4]), Material::new_identity());
-    scene.add_object(Triangle::new(cb[4], cb[0], cb[3]), Material::new_identity());
+    scene.add_object(Triangle::new(cb[3], cb[7], cb[4]), red_diffuse);
+    scene.add_object(Triangle::new(cb[4], cb[0], cb[3]), red_diffuse);
 
     // right wall
-    scene.add_object(Triangle::new(cb[1], cb[5], cb[6]), Material::new_identity());
-    scene.add_object(Triangle::new(cb[6], cb[2], cb[1]), Material::new_identity());
+    scene.add_object(Triangle::new(cb[1], cb[5], cb[6]), green_diffuse);
+    scene.add_object(Triangle::new(cb[6], cb[2], cb[1]), green_diffuse);
 
     let mut ren = EyeLight::new(cam, scene);
     let mut iter_nb = 0;
+    let mut pixels = (0..(res.x * res.y * 4)).map(|_| 255u8).collect::<Vec<_>>();
 
-    let mut im = sfml::graphics::Image::new(res.x as u32, res.y as u32).expect("Shit...");
-    let mut tex = sfml::graphics::Texture::new_from_image(&im).expect("Dam it");
+    let mut tex = Texture::new(res.x as u32, res.y as u32).expect("cant create texture");
     while window.is_open() {
         iter_nb += 1;
         for event in window.events() {
@@ -109,19 +132,20 @@ fn main() {
         }
 
         ren.iterate(iter_nb);
-        let fb = ren.get_framebuffer();
-        let fb_stg = fb.as_slice();
-        for x in 0..res.x {
-            for y in 0..res.y{
-                let col = fb_stg[fb.idx(Vec2u::new(x, y))];
-                im.set_pixel(x as u32, y as u32, &vec3f_to_color(col / iter_nb as f32));
-            }
+        let fb = ren.get_framebuffer().as_slice();
+
+        let k = 1.0 / iter_nb as f32;
+        for pix in 0..(res.x * res.y) {
+            let col = fb[pix];
+            pixels[pix * 4]     = f32_to_u8(col.x * k);
+            pixels[pix * 4 + 1] = f32_to_u8(col.y * k);
+            pixels[pix * 4 + 2] = f32_to_u8(col.z * k);
         }
         println!("{:?}", iter_nb);
-        tex.update_from_image(&im, 0, 0);
-        let sprite = sfml::graphics::Sprite::new_with_texture(&tex).expect("Ugh...");
-        window.clear(&Color::new_rgb(0, 200, 200));
+        tex.update_from_pixels(&pixels, res.x as u32, res.y as u32, 0, 0);
+        let sprite = Sprite::new_with_texture(&tex).expect("cant create sprite");
+        window.clear(&Color::new_rgb(0, 0, 0));
         window.draw(&sprite);
-        window.display()
+        window.display();
     }
 }

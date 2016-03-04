@@ -1,5 +1,6 @@
 #![allow(dead_code)]
 use math::{Vec3f, Vec2u, vec3_from_value};
+use std::borrow::Borrow;
 
 #[derive(Debug, Clone)]
 pub struct FrameBuffer {
@@ -34,5 +35,11 @@ impl FrameBuffer {
 
     pub fn as_slice(&self) -> &[Vec3f] {
         self.frame.as_ref()
+    }
+}
+
+impl Borrow<[Vec3f]> for FrameBuffer {
+    fn borrow(&self) -> &[Vec3f] {
+        self.as_slice()
     }
 }
