@@ -1,18 +1,27 @@
 pub use nalgebra::BaseNum;
+pub use num::traits::{Zero, One};
+
+pub const EPS_COSINE: f32 = 1.0e-6;
+pub const EPS_RAY: f32 =    1.0e-3;
 
 pub mod vector_traits {
     pub use nalgebra::{Absolute, BaseFloat, Cross, Dot, FloatVec, Norm, Vec2, Vec3, Vec4};
 
     pub trait VectorExtra<T>: FloatVec<T> where T: BaseFloat {
-        fn reflect(self, normal: &Self) -> Self;
+        fn reflect_local(&self) -> Self;
+        fn reflect_global(&self, normal: &Self) -> Self;
     }
 
-    impl<T, S> VectorExtra<S> for T
-        where T: FloatVec<S> + Clone,
-              S: From<f32> + BaseFloat {
-        fn reflect(self, normal: &T) -> T {
+    impl<S> VectorExtra<S> for Vec3<S>
+        where S: From<f32> + BaseFloat,
+              Vec3<S>: FloatVec<S> {
+        fn reflect_local(&self) -> Vec3<S> {
+            Vec3::new(-self.x, -self.y, self.z)
+        }
+
+        fn reflect_global(&self, normal: &Vec3<S>) -> Vec3<S> {
             let scale: S = <S as From<f32>>::from(2.0) * self.dot(normal).abs();
-            (self + normal.clone() * scale).normalize()
+            (*self + normal.clone() * scale).normalize()
         }
     }
 }

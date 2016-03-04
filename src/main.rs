@@ -19,8 +19,11 @@ use sfml::window::{VideoMode, ContextSettings, event, window_style};
 use brdf::Material;
 use camera::{PerspectiveCamera, CameraBuilder, Camera};
 use geometry::{GeometryList, Sphere, Triangle};
-use math::{Vec3f, Vec2u, vec3_from_value};
-use render::{EyeLight, Render};
+use math::{Vec3f, Vec2u, One, Zero, vec3_from_value};
+use render::Render;
+#[allow(unused_imports)]
+use render::EyeLight;
+use pathtracer::CpuPathTracer;
 use scene::Scene;
 
 fn f32_to_u8(f: f32) -> u8 {
@@ -55,19 +58,19 @@ fn main() {
 
     let white_diffuse = Material {
         diffuse: vec3_from_value(0.8),
-        specular: vec3_from_value(0.0),
+        specular: Zero::zero(),
         phong_exponent: 1.0
     };
 
     let green_diffuse = Material {
         diffuse: Vec3f::new(0.156863, 0.803922, 0.172549),
-        specular: vec3_from_value(0.0),
+        specular: Zero::zero(),
         phong_exponent: 1.0
     };
 
     let red_diffuse = Material {
         diffuse: Vec3f::new(0.803922, 0.152941, 0.152941),
-        specular: vec3_from_value(0.0),
+        specular: Zero::zero(),
         phong_exponent: 1.0
     };
 
@@ -79,7 +82,7 @@ fn main() {
 
     let dark_mirror = Material {
         diffuse: vec3_from_value(0.1),
-        specular: vec3_from_value(1.0),
+        specular: One::one(),
         phong_exponent: 4000000.0
     };
 
@@ -117,7 +120,9 @@ fn main() {
     scene.add_object(Triangle::new(cb[1], cb[5], cb[6]), green_diffuse);
     scene.add_object(Triangle::new(cb[6], cb[2], cb[1]), green_diffuse);
 
-    let mut ren = EyeLight::new(cam, scene);
+
+
+    let mut ren = CpuPathTracer::new(cam, scene);
     let mut iter_nb = 0;
     let mut pixels = (0..(res.x * res.y * 4)).map(|_| 255u8).collect::<Vec<_>>();
 

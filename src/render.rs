@@ -50,12 +50,11 @@ impl<S> Render<S> for EyeLight<S> where S: Scene {
                 let l_dot_n = isect.normal.dot(&-ray.dir);
                 if let SurfaceProperties::Material(mat_id) = isect.surface {
                     self.frame.add_color(
-                        Vec2u::new(x, y),
-                        self.scene.get_material(mat_id).diffuse * l_dot_n.max(-l_dot_n)
+                        (x, y), self.scene.get_material(mat_id).diffuse * l_dot_n.max(-l_dot_n)
                     );
                 }
             } else {
-                self.frame.add_color(Vec2u::new(x, y), vec3_from_value(0.5));
+                self.frame.add_color((x, y), vec3_from_value(0.5));
             }
         }
     }
@@ -64,9 +63,3 @@ impl<S> Render<S> for EyeLight<S> where S: Scene {
         &self.frame
     }
 }
-
-// impl EyeLight {
-//     fn new() -> EyeLight {
-
-//     }
-// }

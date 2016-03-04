@@ -1,6 +1,6 @@
 #![allow(dead_code)]
 use math::vector_traits::*;
-use math::{Vec3f, vec3_from_value, ortho};
+use math::{Vec3f, ortho, vec3_from_value};
 use scene::SurfaceProperties;
 use std::f32;
 
@@ -248,11 +248,11 @@ impl GeometryManager for GeometryList {
 }
 
 impl Frame {
-    fn new(ox: Vec3f, oy: Vec3f, oz: Vec3f) -> Frame {
+    pub fn new(ox: Vec3f, oy: Vec3f, oz: Vec3f) -> Frame {
         Frame { ox: ox, oy: oy, oz: oz }
     }
 
-    fn new_identity() -> Frame {
+    pub fn new_identity() -> Frame {
         Frame {
             ox: Vec3f::new(1.0, 0.0, 0.0),
             oy: Vec3f::new(0.0, 1.0, 0.0),
@@ -260,7 +260,7 @@ impl Frame {
         }
     }
 
-    fn new_from_z(oz: Vec3f) -> Frame {
+    pub fn from_z(oz: Vec3f) -> Frame {
         let oz = oz.normalize();
         let temp_ox = ortho(&oz);
         let oy = oz.cross(&temp_ox).normalize();
@@ -268,23 +268,23 @@ impl Frame {
         Frame { ox: ox, oy: oy, oz: oz }
     }
 
-    fn normal(&self) -> Vec3f {
+    pub fn normal(&self) -> Vec3f {
         self.oz
     }
 
-    fn tangent(&self) -> Vec3f {
+    pub fn tangent(&self) -> Vec3f {
         self.oy
     }
 
-    fn binormal(&self) -> Vec3f {
+    pub fn binormal(&self) -> Vec3f {
         self.ox
     }
 
-    fn to_world(&self, v: &Vec3f) -> Vec3f {
+    pub fn to_world(&self, v: &Vec3f) -> Vec3f {
         self.ox * v.x + self.oy * v.y + self.oz * v.z
     }
 
-    fn to_local(&self, v: &Vec3f) -> Vec3f {
+    pub fn to_local(&self, v: &Vec3f) -> Vec3f {
         Vec3f {
             x: v.dot(&self.ox),
             y: v.dot(&self.oy),
