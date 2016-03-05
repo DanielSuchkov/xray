@@ -102,8 +102,8 @@ fn main() {
     ];
 
     // floor
-    scene.add_object(Triangle::new(cb[7], cb[4], cb[5]), white_diffuse);
-    scene.add_object(Triangle::new(cb[5], cb[6], cb[7]), white_diffuse);
+    scene.add_object(Triangle::new(cb[5], cb[4], cb[7]), white_diffuse);
+    scene.add_object(Triangle::new(cb[7], cb[6], cb[5]), white_diffuse);
 
     // ceiling
     scene.add_object(Triangle::new(cb[0], cb[1], cb[2]), white_diffuse);
@@ -122,7 +122,7 @@ fn main() {
     scene.add_object(Triangle::new(cb[6], cb[2], cb[1]), green_diffuse);
 
     scene.add_light(AreaLight::new(
-        Vec3f::new(0.0, 2.5, 0.0), Vec3f::new(0.0, 1.0, 0.0), Vec3f::new(0.0, 0.0, 1.0),
+        Vec3f::new(-1.25, 3.75, 3.75), Vec3f::new(-1.25, 3.75, -1.25), Vec3f::new(3.75, 3.75, -1.25),
         vec3_from_value(0.95492965)
     ));
 
