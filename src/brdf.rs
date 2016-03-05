@@ -217,7 +217,7 @@ impl Zero for BrdfEval {
     }
 
     fn is_zero(&self) -> bool {
-        self.radiance.is_zero() || self.dir_pdf_w.is_zero()
+        self.radiance.is_zero()
     }
 }
 

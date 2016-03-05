@@ -57,7 +57,7 @@ impl<S> Render<S> for CpuPathTracer<S> where S: Scene {
 
             let mut path_weight = Vec3f::one();
             let mut color = Vec3f::zero();
-            let mut path_lenght = 0;
+            let mut path_lenght = 1;
             let mut last_pdf_w = 1.0f32;
 
             'current_path: loop {
@@ -66,16 +66,16 @@ impl<S> Render<S> for CpuPathTracer<S> where S: Scene {
                     None => {
                         let backlight = self.scene.get_background_light();
                         let Radiance { intensity, dir_pdf_a } = backlight.get_radiance(&ray.dir, Zero::zero());
-                        if intensity.sqnorm() == 0.0 {
+                        if intensity.is_zero() {
                             break 'current_path;
                         }
-                        let mis_weight = if path_lenght > 1 {
+                        let mis_weight = if path_lenght >= 1 {
                             mis2(last_pdf_w, dir_pdf_a * light_pick_prob)
                         } else {
                             1.0
                         };
 
-                        color = color + path_weight * mis_weight * intensity;
+                        color = color + path_weight * intensity * mis_weight;
                         break 'current_path;
                     },
                     Some(isect) => isect
@@ -88,7 +88,7 @@ impl<S> Render<S> for CpuPathTracer<S> where S: Scene {
                     SurfaceProperties::Material(mat_id) => {
                         Brdf::new(*self.scene.get_material(mat_id), norm_frame, &ray)
                     },
-                    SurfaceProperties::Light(light_id) => { // some geometry light
+                    SurfaceProperties::Light(light_id) => { // some geometry light DEAD CODE!
                         let light = self.scene.get_light(light_id);
                         let Radiance { intensity, dir_pdf_a } = light.get_radiance(&ray.dir, hit_point);
                         if !intensity.is_zero() {
@@ -155,7 +155,8 @@ impl<S> Render<S> for CpuPathTracer<S> where S: Scene {
                                 sample.pdf_w *= cont_prob;
                             }
                             path_weight = path_weight * sample.factor * (cos_theta / sample.pdf_w);
-                            ray.orig = hit_point + ray.dir * EPS_RAY;
+                            ray.dir = -sample.dir;
+                            ray.orig = hit_point + sample.dir * EPS_RAY;
                         }
                     }
                 }

@@ -150,9 +150,9 @@ impl Geometry for Sphere {
             if t0 > t1 { (t1, t0) } else { (t0, t1) }
         };
 
-        let res_t = if t0 > 0.0 {
+        let res_t = if t0 >= 0.0 {
             t0 as f32
-        } else if t1 > 0.0 {
+        } else if t1 >= 0.0 {
             t1 as f32
         } else {
             return None;
@@ -238,7 +238,7 @@ impl GeometryManager for GeometryList {
     fn was_occluded(&self, ray: &Ray, dist: f32) -> bool {
         self.geometries.iter()
             .map(|ref g| g.intersect(&ray))
-            .any(|isect| isect.map_or(false, |isec| isec.dist <= dist))
+            .any(|isect| isect.map_or(false, |isec| isec.dist < dist))
     }
 
     fn add_geometry<G>(&mut self, object: G) where G: GeometrySurface + 'static {

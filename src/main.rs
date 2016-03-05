@@ -58,7 +58,7 @@ fn main() {
 
 
     let white_diffuse = Material {
-        diffuse: vec3_from_value(0.8),
+        diffuse: vec3_from_value(0.9),
         specular: Zero::zero(),
         phong_exp: 1.0
     };
@@ -77,14 +77,14 @@ fn main() {
 
     let blue_diffuse = Material {
         diffuse: Vec3f::new(0.1, 0.9, 0.9),
-        specular: vec3_from_value(0.1),
+        specular: vec3_from_value(0.7),
         phong_exp: 1.0
     };
 
     let dark_mirror = Material {
-        diffuse: vec3_from_value(0.1),
-        specular: One::one(),
-        phong_exp: 4000000.0
+        diffuse: vec3_from_value(0.4),
+        specular: Vec3f::new(0.8, 0.7, 0.6),
+        phong_exp: 4000.0
     };
 
     scene.add_object(Sphere { center: Vec3f::new(0.8, -1.5, 0.0), radius: 0.8 }, blue_diffuse);
@@ -100,30 +100,30 @@ fn main() {
         Vec3f::new( 2.5, -2.5,  2.5), // 6
         Vec3f::new(-2.5, -2.5,  2.5)  // 7
     ];
+    {
+        // floor
+        scene.add_object(Triangle::new(cb[5], cb[4], cb[7]), white_diffuse);
+        scene.add_object(Triangle::new(cb[7], cb[6], cb[5]), white_diffuse);
 
-    // floor
-    scene.add_object(Triangle::new(cb[5], cb[4], cb[7]), white_diffuse);
-    scene.add_object(Triangle::new(cb[7], cb[6], cb[5]), white_diffuse);
+        // ceiling
+        scene.add_object(Triangle::new(cb[0], cb[1], cb[2]), white_diffuse);
+        scene.add_object(Triangle::new(cb[2], cb[3], cb[0]), white_diffuse);
 
-    // ceiling
-    scene.add_object(Triangle::new(cb[0], cb[1], cb[2]), white_diffuse);
-    scene.add_object(Triangle::new(cb[2], cb[3], cb[0]), white_diffuse);
+        // back wall
+        scene.add_object(Triangle::new(cb[2], cb[6], cb[7]), white_diffuse);
+        scene.add_object(Triangle::new(cb[7], cb[3], cb[2]), white_diffuse);
 
-    // back wall
-    scene.add_object(Triangle::new(cb[2], cb[6], cb[7]), white_diffuse);
-    scene.add_object(Triangle::new(cb[7], cb[3], cb[2]), white_diffuse);
+        // left wall
+        scene.add_object(Triangle::new(cb[3], cb[7], cb[4]), red_diffuse);
+        scene.add_object(Triangle::new(cb[4], cb[0], cb[3]), red_diffuse);
 
-    // left wall
-    scene.add_object(Triangle::new(cb[3], cb[7], cb[4]), red_diffuse);
-    scene.add_object(Triangle::new(cb[4], cb[0], cb[3]), red_diffuse);
-
-    // right wall
-    scene.add_object(Triangle::new(cb[1], cb[5], cb[6]), green_diffuse);
-    scene.add_object(Triangle::new(cb[6], cb[2], cb[1]), green_diffuse);
-
+        // right wall
+        scene.add_object(Triangle::new(cb[1], cb[5], cb[6]), green_diffuse);
+        scene.add_object(Triangle::new(cb[6], cb[2], cb[1]), green_diffuse);
+    }
     scene.add_light(AreaLight::new(
         Vec3f::new(-1.25, 3.75, 3.75), Vec3f::new(-1.25, 3.75, -1.25), Vec3f::new(3.75, 3.75, -1.25),
-        vec3_from_value(0.95492965)
+        vec3_from_value(4.95492965)
     ));
 
     let mut ren = CpuPathTracer::new(cam, scene);

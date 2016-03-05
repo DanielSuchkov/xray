@@ -3,7 +3,7 @@ use math::{Vec3f, Zero, EPS_COSINE};
 use math::vector_traits::*;
 use geometry::{Frame};
 use brdf;
-use std::f32;
+// use std::f32;
 
 #[derive(Debug, Clone)]
 pub struct Illumination {
@@ -69,7 +69,7 @@ impl Light for AreaLight {
             Illumination {
                 dir_to_light: dir_to_light,
                 dist_to_light: dist_sqr.sqrt(),
-                dir_pdf_w: f32::NEG_INFINITY, // positive/n, (n < 0) => -inf
+                dir_pdf_w: 0.0,
                 intensity: Zero::zero()
             }
         } else {
@@ -87,7 +87,7 @@ impl Light for AreaLight {
         if cos_out_l == 0.0 {
             Radiance {
                 intensity: Zero::zero(),
-                dir_pdf_a: f32::NEG_INFINITY
+                dir_pdf_a: 0.0
             }
         } else {
             Radiance {
