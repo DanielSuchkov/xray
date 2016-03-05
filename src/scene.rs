@@ -48,7 +48,7 @@ impl<T> Scene for DefaultScene<T> where T: GeometryManager {
             lights: Vec::new(),
             backlight: BackgroundLight {
                 intensity: Vec3f::one() * 0.5,
-                scale: 1.0
+                scale: 0.0
             }
         }
     }

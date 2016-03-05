@@ -159,7 +159,7 @@ impl Geometry for Sphere {
         };
 
         Some(Intersection {
-            normal: (local_origin + vec3_from_value(res_t) * ray.dir).normalize(),
+            normal: (local_origin + ray.dir * res_t).normalize(),
             dist: res_t,
         })
     }

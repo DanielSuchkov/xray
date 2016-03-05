@@ -1,3 +1,4 @@
+#![allow(unused_imports)]
 extern crate sfml;
 extern crate nalgebra;
 extern crate num;
@@ -21,8 +22,7 @@ use camera::{PerspectiveCamera, CameraBuilder, Camera};
 use geometry::{GeometryList, Sphere, Triangle};
 use math::{Vec3f, Vec2u, One, Zero, vec3_from_value};
 use render::Render;
-use light::AreaLight;
-#[allow(unused_imports)]
+use light::{AreaLight, PointLight};
 use render::EyeLight;
 use pathtracer::CpuPathTracer;
 use scene::Scene;
@@ -103,8 +103,8 @@ fn main() {
         scene.add_object(Triangle::new(cb[7], cb[6], cb[5]), white_diffuse);
 
         // ceiling
-        scene.add_object(Triangle::new(cb[0], cb[1], cb[2]), white_diffuse);
         scene.add_object(Triangle::new(cb[2], cb[3], cb[0]), white_diffuse);
+        scene.add_object(Triangle::new(cb[0], cb[1], cb[2]), white_diffuse);
 
         // back wall
         scene.add_object(Triangle::new(cb[2], cb[6], cb[7]), white_diffuse);
@@ -124,8 +124,13 @@ fn main() {
 
     scene.add_light(AreaLight::new(
         Vec3f::new(-2.48, -2.47, 2.48), Vec3f::new(2.48, 2.47, -2.48), Vec3f::new(-2.48, 2.47, -2.48),
-        vec3_from_value(2.95492965)
+        vec3_from_value(2.0)
     ));
+
+    scene.add_light(PointLight {
+        position: Vec3f::new(0.0, 2.20, 0.0),
+        intensity: vec3_from_value(10.0)
+    });
 
     let mut ren = CpuPathTracer::new(cam, scene);
     let mut iter_nb = 0;

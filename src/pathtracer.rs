@@ -79,8 +79,8 @@ impl<S> Render<S> for CpuPathTracer<S> where S: Scene {
                     Some(isect) => isect
                 };
 
-                isect.dist += EPS_RAY;
                 let hit_point = ray.orig + ray.dir * isect.dist;
+                isect.dist += EPS_RAY;
                 let norm_frame = Frame::from_z(isect.normal);
                 let brdf_opt = match isect.surface {
                     SurfaceProperties::Material(mat_id) => {
@@ -116,7 +116,7 @@ impl<S> Render<S> for CpuPathTracer<S> where S: Scene {
                 let light = self.scene.get_light(light_id);
                 let rands = (self.rng.next_f32(), self.rng.next_f32());
                 if let Some(illum) = light.illuminate(hit_point, rands) {
-                    if let Some((brdf_eval, cos_theta)) = brdf.evaluate(&illum.dir_to_light) {
+                    if let Some((brdf_eval, cos_theta)) = brdf.evaluate(&-illum.dir_to_light) {
                         let mut brdf_pdf_w = brdf_eval.dir_pdf_w;
                         let weight = if !light.is_delta() {
                             brdf_pdf_w *= brdf.continuation_prob();
@@ -162,4 +162,3 @@ impl<S> Render<S> for CpuPathTracer<S> where S: Scene {
         &self.frame
     }
 }
-

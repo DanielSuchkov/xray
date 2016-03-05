@@ -41,6 +41,12 @@ pub struct BackgroundLight {
     pub scale: f32
 }
 
+#[derive(Debug, Clone)]
+pub struct PointLight {
+    pub intensity: Vec3f,
+    pub position: Vec3f,
+}
+
 impl AreaLight {
     pub fn new(p0: Vec3f, p1: Vec3f, p2: Vec3f, intensity: Vec3f) -> AreaLight {
         let e1 = p1 - p0;
@@ -115,5 +121,27 @@ impl Light for BackgroundLight {
 
     fn is_delta(&self) -> bool {
         false
+    }
+}
+
+impl Light for PointLight {
+    fn illuminate(&self, receiving_pnt: Vec3f, _rands: (f32, f32)) -> Option<Illumination> {
+        let dir_to_light = self.position - receiving_pnt;
+        let dir_pdf_w  = dir_to_light.sqnorm();
+        let dist = dir_to_light.norm();
+        Some(Illumination {
+            dir_to_light: dir_to_light / dist,
+            dir_pdf_w: dir_pdf_w,
+            dist_to_light: dist,
+            intensity: self.intensity
+        })
+    }
+
+    fn get_radiance(&self, _dir: &Vec3f, _hit: Vec3f) -> Option<Radiance> {
+        None
+    }
+
+    fn is_delta(&self) -> bool {
+        true
     }
 }

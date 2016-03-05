@@ -52,7 +52,7 @@ impl Brdf {
     }
 
     pub fn evaluate(&self, world_dir_gen: &Vec3f) -> Option<(BrdfEval, f32)> {
-        let local_dir_gen = self.frame.to_local(&-*world_dir_gen);
+        let local_dir_gen = self.frame.to_local(world_dir_gen);
         if local_dir_gen.z * self.local_dir_fix.z < 0.0 {
             None
         } else {
