@@ -21,6 +21,7 @@ use camera::{PerspectiveCamera, CameraBuilder, Camera};
 use geometry::{GeometryList, Sphere, Triangle};
 use math::{Vec3f, Vec2u, One, Zero, vec3_from_value};
 use render::Render;
+use light::AreaLight;
 #[allow(unused_imports)]
 use render::EyeLight;
 use pathtracer::CpuPathTracer;
@@ -120,7 +121,10 @@ fn main() {
     scene.add_object(Triangle::new(cb[1], cb[5], cb[6]), green_diffuse);
     scene.add_object(Triangle::new(cb[6], cb[2], cb[1]), green_diffuse);
 
-
+    scene.add_light(AreaLight::new(
+        Vec3f::new(0.0, 2.5, 0.0), Vec3f::new(0.0, 1.0, 0.0), Vec3f::new(0.0, 0.0, 1.0),
+        vec3_from_value(0.95492965)
+    ));
 
     let mut ren = CpuPathTracer::new(cam, scene);
     let mut iter_nb = 0;

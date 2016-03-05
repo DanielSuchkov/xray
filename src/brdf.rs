@@ -27,6 +27,13 @@ pub struct BrdfEval {
 }
 
 #[derive(Debug, Clone)]
+pub struct Sample {
+    pub factor: Vec3f,
+    pub dir: Vec3f,
+    pub pdf_w: f32
+}
+
+#[derive(Debug, Clone)]
 struct Probabilities {
     diffuse: f32,
     phong: f32,
@@ -60,6 +67,33 @@ impl Brdf {
         }
     }
 
+    pub fn sample(&self, rands: (f32, f32, f32)) -> Option<(Sample, f32)> {
+        let mut sample = if rands.2 < self.prob.diffuse {
+            self.sample_diffuse((rands.0, rands.1)).map(|mut diff_sample| {
+                let phong_eval = self.evaluate_phong(&diff_sample.dir);
+                diff_sample.factor = diff_sample.factor + phong_eval.radiance;
+                diff_sample.pdf_w += phong_eval.dir_pdf_w;
+                diff_sample
+            })
+        } else {
+            self.sample_phong((rands.0, rands.1)).map(|mut phong_sample| {
+                let diff_eval = self.evaluate_diffuse(&phong_sample.dir);
+                phong_sample.factor = phong_sample.factor + diff_eval.radiance;
+                phong_sample.pdf_w += diff_eval.dir_pdf_w;
+                phong_sample
+            })
+        };
+
+        match sample {
+            Some(ref mut sample) if sample.dir.z.abs() >= EPS_COSINE => {
+                let cos_theta = sample.dir.z.abs();
+                sample.dir = self.frame.to_world(&sample.dir);
+                Some((sample.clone(), cos_theta))
+            },
+            _ => None
+        }
+    }
+
     pub fn continuation_prob(&self) -> f32 {
         self.prob.continuation
     }
@@ -88,8 +122,55 @@ impl Brdf {
                 let rho = self.material.specular * (self.material.phong_exp + 2.0) * 0.5 * FRAC_1_PI;
                 BrdfEval {
                     radiance: rho * dot_refl_wi.powf(self.material.phong_exp),
-                    dir_pdf_w: pdf_w
+                    dir_pdf_w: pdf_w * self.prob.phong
                 }
+            }
+        }
+    }
+
+    fn sample_diffuse(&self, rands: (f32, f32)) -> Option<Sample> {
+        if self.local_dir_fix.z < EPS_COSINE {
+            None
+        } else {
+            let (local_dir, pdf_w) = cos_hemisphere_sample_w(rands);
+            Some(Sample {
+                factor: self.material.diffuse * FRAC_1_PI,
+                dir: local_dir,
+                pdf_w: pdf_w * self.prob.diffuse
+            })
+        }
+    }
+
+    fn sample_phong(&self, rands: (f32, f32)) -> Option<Sample> {
+        let (local_dir_gen, _) = cos_hemisphere_pow_sample_w(self.material.phong_exp, rands);
+        let local_refl_fix = self.local_dir_fix.reflect_local();
+        let local_dir_gen = {
+            let frame = Frame::from_z(local_refl_fix);
+            frame.to_world(&local_dir_gen)
+        };
+        let dot_refl_wi = local_refl_fix.dot(&local_dir_gen);
+        if dot_refl_wi <= EPS_PHONG {
+            None
+        } else {
+            Some(Sample {
+                dir: local_dir_gen,
+                pdf_w: self.pdf_w_phong(&local_dir_gen),
+                factor: self.material.specular * (self.material.phong_exp + 2.0) * 0.5 * FRAC_1_PI
+            })
+        }
+    }
+
+    fn pdf_w_phong(&self, local_dir: &Vec3f) -> f32 {
+        if self.prob.phong == 0.0 {
+            0.0
+        } else {
+            let local_refl_fix = self.local_dir_fix.reflect_local();
+            let dot_refl_wi = local_refl_fix.dot(local_dir);
+            if dot_refl_wi <= EPS_COSINE {
+                0.0
+            } else {
+                let pdf_w = cos_hemisphere_pow_pdf_w(&local_refl_fix, local_dir, self.material.phong_exp);
+                pdf_w * self.prob.phong
             }
         }
     }

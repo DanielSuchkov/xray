@@ -53,11 +53,11 @@ impl<S> Render<S> for CpuPathTracer<S> where S: Scene {
             } else {
                 Vec2f::new(self.rng.next_f32(), self.rng.next_f32())
             };
-            let ray = self.camera.ray_from_screen(&sample);
+            let mut ray = self.camera.ray_from_screen(&sample);
 
             let mut path_weight = Vec3f::one();
             let mut color = Vec3f::zero();
-            let mut path_lenght = 1;
+            let mut path_lenght = 0;
             let mut last_pdf_w = 1.0f32;
 
             'current_path: loop {
@@ -115,7 +115,7 @@ impl<S> Render<S> for CpuPathTracer<S> where S: Scene {
 
                 // next event estimation
                 {
-                    let light_id = (self.rng.next_f32() * light_count as f32).round() as i32;
+                    let light_id = (self.rng.next_f32() * light_count as f32).floor() as i32;
                     let light = self.scene.get_light(light_id);
                     let rands = (self.rng.next_f32(), self.rng.next_f32());
                     let illum = light.illuminate(hit_point, rands);
@@ -139,9 +139,28 @@ impl<S> Render<S> for CpuPathTracer<S> where S: Scene {
                     }
                 }
 
+                // calc next step
+                {
+                    let rands = (self.rng.next_f32(), self.rng.next_f32(), self.rng.next_f32());
+                    let sample = brdf.sample(rands);
+                    match sample {
+                        None => break 'current_path,
+                        Some((mut sample, cos_theta)) => {
+                            let cont_prob = brdf.continuation_prob();
+                            last_pdf_w = sample.pdf_w * cont_prob;
+                            if cont_prob < 1.0 { // russian roulette
+                                if cont_prob < self.rng.next_f32() {
+                                    break 'current_path;
+                                }
+                                sample.pdf_w *= cont_prob;
+                            }
+                            path_weight = path_weight * sample.factor * (cos_theta / sample.pdf_w);
+                            ray.orig = hit_point + ray.dir * EPS_RAY;
+                        }
+                    }
+                }
                 path_lenght += 1;
             }
-
             self.frame.add_color((x, y), color);
         }
     }
