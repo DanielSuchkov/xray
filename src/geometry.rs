@@ -76,6 +76,7 @@ pub trait GeometrySurface {
 pub trait GeometryManager {
     fn new() -> Self;
     fn nearest_intersection(&self, ray: &Ray) -> Option<SurfaceIntersection>;
+    fn was_occluded(&self, ray: &Ray, dist: f32) -> bool;
     fn add_geometry<G>(&mut self, object: G) where G: GeometrySurface + 'static;
     fn build_aabbox(&self) -> AABBox;
 }
@@ -232,6 +233,12 @@ impl GeometryManager for GeometryList {
                     isect.map_or(curr, |ref isec| if isec.dist < cur.dist { isect } else { curr })
                 )
             )
+    }
+
+    fn was_occluded(&self, ray: &Ray, dist: f32) -> bool {
+        self.geometries.iter()
+            .map(|ref g| g.intersect(&ray))
+            .any(|isect| isect.map_or(false, |isec| isec.dist <= dist))
     }
 
     fn add_geometry<G>(&mut self, object: G) where G: GeometrySurface + 'static {

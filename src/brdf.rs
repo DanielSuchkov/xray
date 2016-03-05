@@ -1,14 +1,29 @@
 #![allow(dead_code)]
-use math::{Vec3f, Vec2f, Zero, EPS_COSINE};
-// use math::vector_traits::*;
-use std::f32;
+use math::{Vec3f, Vec2f, Zero, EPS_COSINE, EPS_PHONG};
+use math::vector_traits::*;
+use std::f32::consts::{FRAC_1_PI, PI};
 use geometry::{Frame, Ray};
+use std::ops::Add;
 
 #[derive(Debug, Clone, PartialEq, Copy)]
 pub struct Material {
     pub diffuse: Vec3f,
     pub specular: Vec3f,
-    pub phong_exponent: f32
+    pub phong_exp: f32
+}
+
+#[derive(Debug, Clone)]
+pub struct Brdf {
+    material: Material,
+    frame: Frame,
+    local_dir_fix: Vec3f,
+    prob: Probabilities,
+}
+
+#[derive(Debug, Clone)]
+pub struct BrdfEval {
+    pub radiance: Vec3f,
+    pub dir_pdf_w: f32,
 }
 
 #[derive(Debug, Clone)]
@@ -18,12 +33,66 @@ struct Probabilities {
     continuation: f32,
 }
 
-#[derive(Debug, Clone)]
-pub struct Brdf {
-    material: Material,
-    frame: Frame,
-    local_dir: Vec3f,
-    prob: Probabilities,
+impl Brdf {
+    pub fn new(mat: Material, frame: Frame, ray: &Ray) -> Option<Brdf> {
+        let local_dir = frame.to_local(&-ray.dir);
+        let prob = Probabilities::new(&mat);
+        if local_dir.z.abs() < EPS_COSINE || prob.continuation == 0.0 {
+            None
+        } else {
+            Some(Brdf {
+                material: mat,
+                local_dir_fix: local_dir,
+                frame: frame,
+                prob: prob
+            })
+        }
+    }
+
+    pub fn evaluate(&self, world_dir_gen: &Vec3f) -> (BrdfEval, f32) {
+        let local_dir_gen = self.frame.to_local(&world_dir_gen);
+        if local_dir_gen.z * self.local_dir_fix.z < 0.0 {
+            (BrdfEval { radiance: Zero::zero(), dir_pdf_w: Zero::zero() }, Zero::zero())
+        } else {
+            let diffuse = self.evaluate_diffuse(&local_dir_gen);
+            let phong = self.evaluate_phong(&local_dir_gen);
+            (diffuse + phong, local_dir_gen.z.abs())
+        }
+    }
+
+    pub fn continuation_prob(&self) -> f32 {
+        self.prob.continuation
+    }
+
+    fn evaluate_diffuse(&self, local_dir_gen: &Vec3f) -> BrdfEval {
+        if self.prob.diffuse == 0.0 {
+            Zero::zero()
+        } else {
+            BrdfEval {
+                radiance: self.material.diffuse * FRAC_1_PI,
+                dir_pdf_w: self.prob.diffuse * (local_dir_gen.z * FRAC_1_PI).max(0.0)
+            }
+        }
+    }
+
+    fn evaluate_phong(&self, local_dir_gen: &Vec3f) -> BrdfEval {
+        if self.prob.phong == 0.0 || self.local_dir_fix.z < EPS_COSINE || local_dir_gen.z < EPS_COSINE {
+            Zero::zero()
+        } else {
+            let local_refl_fix = self.local_dir_fix.reflect_local();
+            let dot_refl_wi = local_refl_fix.dot(local_dir_gen);
+            if dot_refl_wi <= EPS_PHONG {
+                Zero::zero()
+            } else {
+                let pdf_w = cos_hemisphere_pow_pdf_w(&local_refl_fix, local_dir_gen, self.material.phong_exp);
+                let rho = self.material.specular * (self.material.phong_exp + 2.0) * 0.5 * FRAC_1_PI;
+                BrdfEval {
+                    radiance: rho * dot_refl_wi.powf(self.material.phong_exp),
+                    dir_pdf_w: pdf_w
+                }
+            }
+        }
+    }
 }
 
 impl Material {
@@ -31,7 +100,7 @@ impl Material {
         Material {
             diffuse: Zero::zero(),
             specular: Zero::zero(),
-            phong_exponent: 0.0
+            phong_exp: 0.0
         }
     }
 
@@ -45,6 +114,29 @@ impl Material {
 
     fn total_albedo(&self) -> f32 {
         self.albedo_specular() + self.albedo_diffuse()
+    }
+}
+
+impl Add for BrdfEval {
+    type Output = BrdfEval;
+    fn add(self, rhs: BrdfEval) -> BrdfEval {
+        BrdfEval {
+            radiance: self.radiance + rhs.radiance,
+            dir_pdf_w: self.dir_pdf_w + rhs.dir_pdf_w
+        }
+    }
+}
+
+impl Zero for BrdfEval {
+    fn zero() -> BrdfEval {
+        BrdfEval {
+            radiance: Zero::zero(),
+            dir_pdf_w: Zero::zero(),
+        }
+    }
+
+    fn is_zero(&self) -> bool {
+        self.radiance.is_zero() || self.dir_pdf_w.is_zero()
     }
 }
 
@@ -69,49 +161,28 @@ impl Probabilities {
     }
 }
 
-impl Brdf {
-    pub fn new(mat: Material, frame: Frame, ray: &Ray) -> Option<Brdf> {
-        let local_dir = frame.to_local(&-ray.dir);
-        let prob = Probabilities::new(&mat);
-        if local_dir.x.abs() < EPS_COSINE || prob.continuation == 0.0 {
-            None
-        } else {
-            Some(Brdf {
-                material: mat,
-                local_dir: local_dir,
-                frame: frame,
-                prob: prob
-            })
-        }
-    }
-
-    pub fn continuation_prob(&self) -> f32 {
-        self.prob.continuation
-    }
-}
-
 fn luminance(a_rgb: &Vec3f) -> f32 {
     0.212671 * a_rgb.x + 0.715160 * a_rgb.y + 0.072169 * a_rgb.z
 }
 
 // returns vector and pdf
 pub fn cos_hemisphere_sample_w(rnd: (f32, f32)) -> (Vec3f, f32) {
-    let phi = rnd.0 * 2.0 * f32::consts::PI;
+    let phi = rnd.0 * 2.0 * PI;
     let costheta = rnd.1.sqrt();
     let sintheta = (1.0 - costheta * costheta).sqrt();
 
     let ret = Vec3f::new(sintheta * phi.cos(), sintheta * phi.sin(), costheta);
-    (ret, ret.z * f32::consts::FRAC_1_PI)
+    (ret, ret.z * FRAC_1_PI)
 }
 
 // returns vector and pdf
 pub fn cos_hemisphere_pow_sample_w(phong_exp: f32, rnd: (f32, f32)) -> (Vec3f, f32) {
-    let phi = rnd.0 * 2.0 * f32::consts::PI;
+    let phi = rnd.0 * 2.0 * PI;
     let costheta = rnd.1.powf(1.0 / (phong_exp + 1.0));
     let sintheta = (1.0 - costheta * costheta).sqrt();
 
     let ret = Vec3f::new(sintheta * phi.cos(), sintheta * phi.sin(), costheta);
-    (ret, (phong_exp + 1.0) * costheta.powf(phong_exp) * (0.5 * f32::consts::FRAC_1_PI))
+    (ret, (phong_exp + 1.0) * costheta.powf(phong_exp) * (0.5 * FRAC_1_PI))
 }
 
 pub fn uniform_triangle_sample(rnd: (f32, f32)) -> Vec2f {
@@ -120,15 +191,19 @@ pub fn uniform_triangle_sample(rnd: (f32, f32)) -> Vec2f {
 }
 
 pub fn uniform_sphere_sample_w(rnd: (f32, f32)) -> (Vec3f, f32) {
-    let phi = rnd.0 * 2.0 * f32::consts::PI;
+    let phi = rnd.0 * 2.0 * PI;
     let term2 = 2.0 * (rnd.1 - rnd.1 * rnd.1).sqrt();
 
-    (Vec3f::new(phi.cos() * term2, phi.sin() * term2, 1.0 - 2.0 * rnd.1),
-        uniform_sphere_pdf_w())
+    (Vec3f::new(phi.cos() * term2, phi.sin() * term2, 1.0 - 2.0 * rnd.1), uniform_sphere_pdf_w())
+}
+
+pub fn cos_hemisphere_pow_pdf_w(normal: &Vec3f, dir: &Vec3f, phong_exp: f32) -> f32 {
+    let cos_theta = normal.dot(dir).max(0.0);
+    (phong_exp + 1.0) * cos_theta.powf(phong_exp) * (0.5 * FRAC_1_PI)
 }
 
 pub fn uniform_sphere_pdf_w() -> f32 {
-    0.25 * f32::consts::FRAC_1_PI
+    0.25 * FRAC_1_PI
 }
 
 pub fn pdf_w_to_a(pdf_w: f32, dist: f32, cos_there: f32) -> f32 {

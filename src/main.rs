@@ -59,31 +59,31 @@ fn main() {
     let white_diffuse = Material {
         diffuse: vec3_from_value(0.8),
         specular: Zero::zero(),
-        phong_exponent: 1.0
+        phong_exp: 1.0
     };
 
     let green_diffuse = Material {
         diffuse: Vec3f::new(0.156863, 0.803922, 0.172549),
         specular: Zero::zero(),
-        phong_exponent: 1.0
+        phong_exp: 1.0
     };
 
     let red_diffuse = Material {
         diffuse: Vec3f::new(0.803922, 0.152941, 0.152941),
         specular: Zero::zero(),
-        phong_exponent: 1.0
+        phong_exp: 1.0
     };
 
     let blue_diffuse = Material {
         diffuse: Vec3f::new(0.1, 0.9, 0.9),
         specular: vec3_from_value(0.1),
-        phong_exponent: 1.0
+        phong_exp: 1.0
     };
 
     let dark_mirror = Material {
         diffuse: vec3_from_value(0.1),
         specular: One::one(),
-        phong_exponent: 4000000.0
+        phong_exp: 4000000.0
     };
 
     scene.add_object(Sphere { center: Vec3f::new(0.8, -1.5, 0.0), radius: 0.8 }, blue_diffuse);

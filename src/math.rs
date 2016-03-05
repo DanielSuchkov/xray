@@ -3,6 +3,7 @@ pub use num::traits::{Zero, One};
 
 pub const EPS_COSINE: f32 = 1.0e-6;
 pub const EPS_RAY: f32 =    1.0e-3;
+pub const EPS_PHONG: f32 =  1.0e-3;
 
 pub mod vector_traits {
     pub use nalgebra::{Absolute, BaseFloat, Cross, Dot, FloatVec, Norm, Vec2, Vec3, Vec4};

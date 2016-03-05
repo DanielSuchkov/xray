@@ -2,8 +2,8 @@
 use brdf::{Brdf, pdf_a_to_w};
 use camera::PerspectiveCamera;
 use framebuffer::FrameBuffer;
-use geometry::Frame;
-use light::{Light, Radiance, Illumination};
+use geometry::{Frame, Ray};
+use light::{Light, Radiance};
 use math::vector_traits::*;
 use math::{Vec2u, Vec3f, Vec2f, Zero, One, EPS_RAY};
 use rand::{StdRng, Rng};
@@ -120,7 +120,22 @@ impl<S> Render<S> for CpuPathTracer<S> where S: Scene {
                     let rands = (self.rng.next_f32(), self.rng.next_f32());
                     let illum = light.illuminate(hit_point, rands);
                     if !illum.intensity.is_zero() {
-                        // pathtracer.cxx: 150
+                        let (brdf_eval, cos_theta) = brdf.evaluate(&illum.dir_to_light);
+                        let mut brdf_pdf_w = brdf_eval.dir_pdf_w;
+                        if !brdf_eval.is_zero() {
+                            let weight = if !light.is_delta() {
+                                brdf_pdf_w *= brdf.continuation_prob();
+                                mis2(illum.dir_pdf_w * light_pick_prob, brdf_pdf_w)
+                            } else {
+                                1.0
+                            };
+                            let conrib_radiance = (illum.intensity * brdf_eval.radiance)
+                                * (weight * cos_theta / (light_pick_prob * illum.dir_pdf_w));
+                            let ray_to_light = Ray { orig: hit_point, dir: illum.dir_to_light };
+                            if !self.scene.was_occluded(&ray_to_light, illum.dist_to_light) {
+                                color = color + conrib_radiance * path_weight;
+                            }
+                        }
                     }
                 }
 
