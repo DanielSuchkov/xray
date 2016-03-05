@@ -20,8 +20,8 @@ pub struct Radiance {
 }
 
 pub trait Light {
-    fn illuminate(&self, receiving_pnt: Vec3f, rands: (f32, f32)) -> Illumination;
-    fn get_radiance(&self, dir: &Vec3f, hit: Vec3f) -> Radiance;
+    fn illuminate(&self, receiving_pnt: Vec3f, rands: (f32, f32)) -> Option<Illumination>;
+    fn get_radiance(&self, dir: &Vec3f, hit: Vec3f) -> Option<Radiance>;
     fn is_delta(&self) -> bool;
 }
 
@@ -50,7 +50,7 @@ impl AreaLight {
             p0: p0,
             e1: e1,
             e2: e2,
-            frame: Frame::from_z(normal),
+            frame: Frame::from_z(normal.normalize()),
             inv_area: 2.0 / normal.norm(),
             intensity: intensity
         }
@@ -58,7 +58,7 @@ impl AreaLight {
 }
 
 impl Light for AreaLight {
-    fn illuminate(&self, receiving_pnt: Vec3f, rands: (f32, f32)) -> Illumination {
+    fn illuminate(&self, receiving_pnt: Vec3f, rands: (f32, f32)) -> Option<Illumination> {
         let uv = brdf::uniform_triangle_sample(rands);
         let light_pnt = self.p0 + self.e1 * uv.x + self.e2 * uv.y;
         let dir_to_light = light_pnt - receiving_pnt;
@@ -66,34 +66,26 @@ impl Light for AreaLight {
         let dir_to_light = dir_to_light.normalize();
         let cos_normal_dir = self.frame.normal().dot(&-dir_to_light);
         if cos_normal_dir <= EPS_COSINE {
-            Illumination {
-                dir_to_light: dir_to_light,
-                dist_to_light: dist_sqr.sqrt(),
-                dir_pdf_w: 0.0,
-                intensity: Zero::zero()
-            }
+            None
         } else {
-            Illumination {
+            Some(Illumination {
                 dir_to_light: dir_to_light,
                 dist_to_light: dist_sqr.sqrt(),
                 dir_pdf_w: self.inv_area * dist_sqr / cos_normal_dir,
                 intensity: self.intensity
-            }
+            })
         }
     }
 
-    fn get_radiance(&self, dir: &Vec3f, _hit: Vec3f) -> Radiance {
+    fn get_radiance(&self, dir: &Vec3f, _hit: Vec3f) -> Option<Radiance> {
         let cos_out_l = self.frame.normal().dot(&-dir.clone()).max(0.0);
-        if cos_out_l == 0.0 {
-            Radiance {
-                intensity: Zero::zero(),
-                dir_pdf_a: 0.0
-            }
+        if cos_out_l < EPS_COSINE {
+            None
         } else {
-            Radiance {
+            Some(Radiance {
                 intensity: self.intensity,
                 dir_pdf_a: self.inv_area
-            }
+            })
         }
     }
 
@@ -103,22 +95,22 @@ impl Light for AreaLight {
 }
 
 impl Light for BackgroundLight {
-    fn illuminate(&self, _receiving_pnt: Vec3f, rands: (f32, f32)) -> Illumination {
+    fn illuminate(&self, _receiving_pnt: Vec3f, rands: (f32, f32)) -> Option<Illumination> {
         let (dir, dir_pdf_w) = brdf::uniform_sphere_sample_w(rands);
-        Illumination {
+        Some(Illumination {
             dir_to_light: dir,
             dir_pdf_w: dir_pdf_w,
             dist_to_light: 1.0e35,
             intensity: self.intensity * self.scale
-        }
+        })
     }
 
-    fn get_radiance(&self, _dir: &Vec3f, _hit: Vec3f) -> Radiance {
+    fn get_radiance(&self, _dir: &Vec3f, _hit: Vec3f) -> Option<Radiance> {
         let dir_pdf_w = brdf::uniform_sphere_pdf_w();
-        Radiance {
+        Some(Radiance {
             intensity: self.intensity * self.scale,
             dir_pdf_a: dir_pdf_w, // it's ok only for background light
-        }
+        })
     }
 
     fn is_delta(&self) -> bool {

@@ -47,23 +47,18 @@ impl Brdf {
         if local_dir.z.abs() < EPS_COSINE || prob.continuation == 0.0 {
             None
         } else {
-            Some(Brdf {
-                material: mat,
-                local_dir_fix: local_dir,
-                frame: frame,
-                prob: prob
-            })
+            Some(Brdf { material: mat, local_dir_fix: local_dir, frame: frame, prob: prob })
         }
     }
 
-    pub fn evaluate(&self, world_dir_gen: &Vec3f) -> (BrdfEval, f32) {
-        let local_dir_gen = self.frame.to_local(&world_dir_gen);
+    pub fn evaluate(&self, world_dir_gen: &Vec3f) -> Option<(BrdfEval, f32)> {
+        let local_dir_gen = self.frame.to_local(&-*world_dir_gen);
         if local_dir_gen.z * self.local_dir_fix.z < 0.0 {
-            (BrdfEval { radiance: Zero::zero(), dir_pdf_w: Zero::zero() }, Zero::zero())
+            None
         } else {
             let diffuse = self.evaluate_diffuse(&local_dir_gen);
             let phong = self.evaluate_phong(&local_dir_gen);
-            (diffuse + phong, local_dir_gen.z.abs())
+            Some((diffuse + phong, local_dir_gen.z.abs()))
         }
     }
 

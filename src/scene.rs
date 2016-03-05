@@ -2,7 +2,7 @@
 use brdf::Material;
 use geometry::{/*BSphere, */Geometry, GeometryManager, Ray, Surface, SurfaceIntersection};
 use light::{Light, BackgroundLight};
-use math::{vec3_from_value, EPS_RAY};
+use math::{vec3_from_value, Vec3f, EPS_RAY, One};
 // use math::vector_traits::*;
 
 pub type MaterialID = i32;
@@ -47,7 +47,7 @@ impl<T> Scene for DefaultScene<T> where T: GeometryManager {
             materials: Vec::new(),
             lights: Vec::new(),
             backlight: BackgroundLight {
-                intensity: vec3_from_value(0.5),
+                intensity: Vec3f::one() * 0.5,
                 scale: 1.0
             }
         }
@@ -59,7 +59,7 @@ impl<T> Scene for DefaultScene<T> where T: GeometryManager {
 
     fn was_occluded(&self, ray: &Ray, dist: f32) -> bool {
         let ray = Ray { orig: ray.orig + ray.dir * EPS_RAY, dir: ray.dir };
-        !self.geo.was_occluded(&ray, dist - 2.0 * EPS_RAY)
+        self.geo.was_occluded(&ray, dist - 2.0 * EPS_RAY)
     }
 
     fn add_object<G>(&mut self, geo: G, material: Material)

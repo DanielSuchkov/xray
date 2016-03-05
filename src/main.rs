@@ -84,11 +84,8 @@ fn main() {
     let dark_mirror = Material {
         diffuse: vec3_from_value(0.4),
         specular: Vec3f::new(0.8, 0.7, 0.6),
-        phong_exp: 4000.0
+        phong_exp: 40000.0
     };
-
-    scene.add_object(Sphere { center: Vec3f::new(0.8, -1.5, 0.0), radius: 0.8 }, blue_diffuse);
-    scene.add_object(Sphere { center: Vec3f::new(-0.8, -1.5, 0.2), radius: 0.6 }, dark_mirror);
 
     let cb = [
         Vec3f::new(-2.5,  2.5, -2.5), // 0
@@ -121,9 +118,13 @@ fn main() {
         scene.add_object(Triangle::new(cb[1], cb[5], cb[6]), green_diffuse);
         scene.add_object(Triangle::new(cb[6], cb[2], cb[1]), green_diffuse);
     }
+
+    scene.add_object(Sphere { center: Vec3f::new(0.8, -1.5, 0.0), radius: 0.8 }, blue_diffuse);
+    scene.add_object(Sphere { center: Vec3f::new(-0.8, -1.5, 0.2), radius: 0.6 }, dark_mirror);
+
     scene.add_light(AreaLight::new(
-        Vec3f::new(-1.25, 3.75, 3.75), Vec3f::new(-1.25, 3.75, -1.25), Vec3f::new(3.75, 3.75, -1.25),
-        vec3_from_value(4.95492965)
+        Vec3f::new(-2.48, -2.47, 2.48), Vec3f::new(2.48, 2.47, -2.48), Vec3f::new(-2.48, 2.47, -2.48),
+        vec3_from_value(2.95492965)
     ));
 
     let mut ren = CpuPathTracer::new(cam, scene);
