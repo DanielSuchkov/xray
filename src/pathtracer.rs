@@ -5,10 +5,12 @@ use framebuffer::FrameBuffer;
 use geometry::{Frame, Ray};
 use light::{Light, Radiance};
 use math::vector_traits::*;
-use math::{Vec2u, Vec3f, Vec2f, Zero, One, EPS_RAY};
+use math::{Vec2u, Vec3f, Vec2f, Zero, One, EPS_RAY, vec3_from_value};
 use rand::{StdRng, Rng, SeedableRng};
 use render::Render;
 use scene::{Scene, SurfaceProperties};
+
+use nalgebra::ApproxEq;
 
 pub struct CpuPathTracer<S: Scene> {
     frame: FrameBuffer,
@@ -17,13 +19,20 @@ pub struct CpuPathTracer<S: Scene> {
     rng: StdRng,
 }
 
-fn mis(a_pdf: f32) -> f32 {
-    a_pdf
-}
+// fn mis(a_pdf: f32) -> f32 {
+//     a_pdf * a_pdf
+// }
 
-// Mis weight for 2 pdfs
-fn mis2(sample_pdf: f32, other_pdf: f32) -> f32 {
-    mis(sample_pdf) / (mis(sample_pdf) + mis(other_pdf))
+// // Mis weight for 2 pdfs
+// fn mis2(sample_pdf: f32, other_pdf: f32) -> f32 {
+//     (sample_pdf * other_pdf) / (mis(sample_pdf) + mis(other_pdf))
+// }
+
+// Power heuristic (as I understand)
+fn mis2(pdf: f32, other_pdf: f32) -> f32 {
+    let pdf_2 = pdf * pdf;
+    let other_pdf_2 = other_pdf * other_pdf;
+    (pdf_2) / (pdf_2 + other_pdf_2)
 }
 
 const MAX_PATH_LENGTH: u32 = 100;
@@ -43,31 +52,33 @@ impl<S> Render<S> for CpuPathTracer<S> where S: Scene {
     fn iterate(&mut self, iter_nb: usize) {
         let light_count = self.scene.get_lights_nb();
         let light_pick_prob = 1.0 / light_count as f32;
-        self.rng.reseed(&[iter_nb]);
         let res = self.camera.get_view_size();
         let (res_x, res_y) = (res.x as usize, res.y as usize);
         for pix_nb in 0..(res_x * res_y) {
             let (x, y) = (pix_nb % res_x, pix_nb / res_x);
-            let sample = Vec2f::new(x as f32, y as f32)
-                + Vec2f::new(self.rng.next_f32(), self.rng.next_f32());
+            let sample = Vec2f::new(x as f32, y as f32) + if iter_nb == 0 {
+                Vec2f::new(0.5, 0.5)
+            } else {
+                Vec2f::new(self.rng.next_f32(), self.rng.next_f32())
+            };
+
             let mut ray = self.camera.ray_from_screen(&sample);
 
             let mut path_weight = Vec3f::one();
             let mut color = Vec3f::zero();
             let mut path_lenght = 1;
-            let mut last_pdf_w = 1.0f32;
-
+            let mut last_pdf_w = 1.0;
             'current_path: loop {
                 let isect = self.scene.nearest_intersection(&ray);
                 let mut isect = match isect {
                     None => {
                         let backlight = self.scene.get_background_light();
-                        let rad = match backlight.get_radiance(&ray.dir, Zero::zero()) {
+                        let rad = match backlight.get_radiance(&ray.dir, &Zero::zero()) {
                             None => break 'current_path,
                             Some(rad) => rad
                         };
 
-                        let mis_weight = if path_lenght >= 1 {
+                        let mis_weight = if path_lenght > 1 {
                             mis2(last_pdf_w, rad.dir_pdf_a * light_pick_prob)
                         } else {
                             1.0
@@ -88,7 +99,7 @@ impl<S> Render<S> for CpuPathTracer<S> where S: Scene {
                     },
                     SurfaceProperties::Light(light_id) => { // some geometry light DEAD CODE!
                         let light = self.scene.get_light(light_id);
-                        if let Some(rad) = light.get_radiance(&ray.dir, hit_point) {
+                        if let Some(rad) = light.get_radiance(&ray.dir, &hit_point) {
                             let mis_weight = if path_lenght > 1 {
                                 let cos_theta = norm_frame.to_local(&-ray.dir).z;
                                 let dir_pdf_w = pdf_a_to_w(rad.dir_pdf_a, isect.dist, cos_theta);
@@ -115,8 +126,8 @@ impl<S> Render<S> for CpuPathTracer<S> where S: Scene {
                 let light_id = (self.rng.next_f32() * light_count as f32).floor() as i32;
                 let light = self.scene.get_light(light_id);
                 let rands = (self.rng.next_f32(), self.rng.next_f32());
-                if let Some(illum) = light.illuminate(hit_point, rands) {
-                    if let Some((brdf_eval, cos_theta)) = brdf.evaluate(&-illum.dir_to_light) {
+                if let Some(illum) = light.illuminate(&hit_point, rands) {
+                    if let Some((brdf_eval, cos_theta)) = brdf.evaluate(&illum.dir_to_light) {
                         let mut brdf_pdf_w = brdf_eval.dir_pdf_w;
                         let weight = if !light.is_delta() {
                             brdf_pdf_w *= brdf.continuation_prob();
@@ -127,10 +138,8 @@ impl<S> Render<S> for CpuPathTracer<S> where S: Scene {
                         let conrib_radiance = (illum.intensity * brdf_eval.radiance)
                             * (weight * cos_theta / (light_pick_prob * illum.dir_pdf_w));
                         let ray_to_light = Ray { orig: hit_point, dir: illum.dir_to_light };
-                        if !self.scene.was_occluded(&ray_to_light, -illum.dist_to_light) {
+                        if !self.scene.was_occluded(&ray_to_light, illum.dist_to_light) {
                             color = color + conrib_radiance * path_weight;
-                        } else {
-                            color = Vec3f::new(1000.0, 0.0, 1000.0);
                         }
                     }
                 }
@@ -147,7 +156,7 @@ impl<S> Render<S> for CpuPathTracer<S> where S: Scene {
                         sample.pdf_w *= cont_prob;
                     }
                     path_weight = path_weight * sample.factor * (cos_theta / sample.pdf_w);
-                    ray.dir = -sample.dir;
+                    ray.dir = sample.dir;
                     ray.orig = hit_point + sample.dir * EPS_RAY;
                 } else {
                     break 'current_path;

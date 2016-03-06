@@ -80,7 +80,7 @@ impl Brdf {
         };
 
         match sample {
-            Some(ref mut sample) if sample.dir.z.abs() >= EPS_COSINE => {
+            Some(ref mut sample) if sample.dir.z.abs() > EPS_COSINE => {
                 let cos_theta = sample.dir.z.abs();
                 sample.dir = self.frame.to_world(&sample.dir);
                 Some((sample.clone(), cos_theta))
@@ -110,7 +110,7 @@ impl Brdf {
         } else {
             let local_refl_fix = self.local_dir_fix.reflect_local();
             let dot_refl_wi = local_refl_fix.dot(local_dir_gen);
-            if dot_refl_wi <= EPS_PHONG {
+            if dot_refl_wi < EPS_PHONG {
                 Zero::zero()
             } else {
                 let pdf_w = cos_hemisphere_pow_pdf_w(&local_refl_fix, local_dir_gen, self.material.phong_exp);
@@ -144,7 +144,7 @@ impl Brdf {
             frame.to_world(&local_dir_gen)
         };
         let dot_refl_wi = local_refl_fix.dot(&local_dir_gen);
-        if dot_refl_wi <= EPS_PHONG {
+        if dot_refl_wi < EPS_PHONG {
             None
         } else {
             Some(Sample {
@@ -161,7 +161,7 @@ impl Brdf {
         } else {
             let local_refl_fix = self.local_dir_fix.reflect_local();
             let dot_refl_wi = local_refl_fix.dot(local_dir);
-            if dot_refl_wi <= EPS_COSINE {
+            if dot_refl_wi < EPS_COSINE {
                 0.0
             } else {
                 let pdf_w = cos_hemisphere_pow_pdf_w(&local_refl_fix, local_dir, self.material.phong_exp);
@@ -231,13 +231,14 @@ impl Probabilities {
             Probabilities {
                 diffuse: albedo_diffuse / total_albedo,
                 phong: albedo_specular / total_albedo,
-                continuation: total_albedo.min(1.0)
+                continuation: total_albedo//.min(1.0)
             }
         }
     }
 }
 
 fn luminance(a_rgb: &Vec3f) -> f32 {
+    // a_rgb.x + a_rgb.y + a_rgb.z
     0.212671 * a_rgb.x + 0.715160 * a_rgb.y + 0.072169 * a_rgb.z
 }
 

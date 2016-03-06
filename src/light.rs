@@ -20,8 +20,8 @@ pub struct Radiance {
 }
 
 pub trait Light {
-    fn illuminate(&self, receiving_pnt: Vec3f, rands: (f32, f32)) -> Option<Illumination>;
-    fn get_radiance(&self, dir: &Vec3f, hit: Vec3f) -> Option<Radiance>;
+    fn illuminate(&self, receiving_pnt: &Vec3f, rands: (f32, f32)) -> Option<Illumination>;
+    fn get_radiance(&self, dir: &Vec3f, hit: &Vec3f) -> Option<Radiance>;
     fn is_delta(&self) -> bool;
 }
 
@@ -64,10 +64,10 @@ impl AreaLight {
 }
 
 impl Light for AreaLight {
-    fn illuminate(&self, receiving_pnt: Vec3f, rands: (f32, f32)) -> Option<Illumination> {
+    fn illuminate(&self, receiving_pnt: &Vec3f, rands: (f32, f32)) -> Option<Illumination> {
         let uv = brdf::uniform_triangle_sample(rands);
         let light_pnt = self.p0 + self.e1 * uv.x + self.e2 * uv.y;
-        let dir_to_light = light_pnt - receiving_pnt;
+        let dir_to_light = light_pnt - *receiving_pnt;
         let dist_sqr = dir_to_light.sqnorm();
         let dir_to_light = dir_to_light.normalize();
         let cos_normal_dir = self.frame.normal().dot(&-dir_to_light);
@@ -83,7 +83,7 @@ impl Light for AreaLight {
         }
     }
 
-    fn get_radiance(&self, dir: &Vec3f, _hit: Vec3f) -> Option<Radiance> {
+    fn get_radiance(&self, dir: &Vec3f, _hit: &Vec3f) -> Option<Radiance> {
         let cos_out_l = self.frame.normal().dot(&-dir.clone()).max(0.0);
         if cos_out_l < EPS_COSINE {
             None
@@ -101,7 +101,7 @@ impl Light for AreaLight {
 }
 
 impl Light for BackgroundLight {
-    fn illuminate(&self, _receiving_pnt: Vec3f, rands: (f32, f32)) -> Option<Illumination> {
+    fn illuminate(&self, _receiving_pnt: &Vec3f, rands: (f32, f32)) -> Option<Illumination> {
         let (dir, dir_pdf_w) = brdf::uniform_sphere_sample_w(rands);
         Some(Illumination {
             dir_to_light: dir,
@@ -111,7 +111,7 @@ impl Light for BackgroundLight {
         })
     }
 
-    fn get_radiance(&self, _dir: &Vec3f, _hit: Vec3f) -> Option<Radiance> {
+    fn get_radiance(&self, _dir: &Vec3f, _hit: &Vec3f) -> Option<Radiance> {
         let dir_pdf_w = brdf::uniform_sphere_pdf_w();
         Some(Radiance {
             intensity: self.intensity * self.scale,
@@ -125,8 +125,8 @@ impl Light for BackgroundLight {
 }
 
 impl Light for PointLight {
-    fn illuminate(&self, receiving_pnt: Vec3f, _rands: (f32, f32)) -> Option<Illumination> {
-        let dir_to_light = self.position - receiving_pnt;
+    fn illuminate(&self, receiving_pnt: &Vec3f, _rands: (f32, f32)) -> Option<Illumination> {
+        let dir_to_light = self.position - *receiving_pnt;
         let dir_pdf_w  = dir_to_light.sqnorm();
         let dist = dir_to_light.norm();
         Some(Illumination {
@@ -137,7 +137,7 @@ impl Light for PointLight {
         })
     }
 
-    fn get_radiance(&self, _dir: &Vec3f, _hit: Vec3f) -> Option<Radiance> {
+    fn get_radiance(&self, _dir: &Vec3f, _hit: &Vec3f) -> Option<Radiance> {
         None
     }
 

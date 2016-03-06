@@ -36,7 +36,7 @@ fn f32_to_u8(f: f32) -> u8 {
 // }
 
 fn main() {
-    let res = Vec2u::new(800, 600);
+    let res = Vec2u::new(1000, 1000);
     let mut window = RenderWindow::new(
             VideoMode::new_init(res.x as u32, res.y as u32, 32),
             "XRay",
@@ -58,33 +58,35 @@ fn main() {
 
 
     let white_diffuse = Material {
-        diffuse: vec3_from_value(0.9),
+        diffuse: vec3_from_value(0.99),
         specular: Zero::zero(),
         phong_exp: 1.0
     };
 
     let green_diffuse = Material {
         diffuse: Vec3f::new(0.156863, 0.803922, 0.172549),
+        // diffuse: Vec3f::new(0.0, 1.0, 0.0),
         specular: Zero::zero(),
         phong_exp: 1.0
     };
 
     let red_diffuse = Material {
-        diffuse: Vec3f::new(0.803922, 0.152941, 0.152941),
+        diffuse: Vec3f::new(0.803922, 0.152941, 0.172549),
+        // diffuse: Vec3f::new(1.0, 0.0, 0.0),
         specular: Zero::zero(),
         phong_exp: 1.0
     };
 
     let blue_diffuse = Material {
         diffuse: Vec3f::new(0.1, 0.9, 0.9),
-        specular: vec3_from_value(0.7),
+        specular: vec3_from_value(0.0),
         phong_exp: 1.0
     };
 
-    let dark_mirror = Material {
-        diffuse: vec3_from_value(0.4),
-        specular: Vec3f::new(0.8, 0.7, 0.6),
-        phong_exp: 40000.0
+    let golden_glossy = Material {
+        diffuse: vec3_from_value(0.05),
+        specular: Vec3f::new(0.5, 0.5, 0.2),
+        phong_exp: 150.0
     };
 
     let cb = [
@@ -119,17 +121,17 @@ fn main() {
         scene.add_object(Triangle::new(cb[6], cb[2], cb[1]), green_diffuse);
     }
 
-    scene.add_object(Sphere { center: Vec3f::new(0.8, -1.5, 0.0), radius: 0.8 }, blue_diffuse);
-    scene.add_object(Sphere { center: Vec3f::new(-0.8, -1.5, 0.2), radius: 0.6 }, dark_mirror);
+    scene.add_object(Sphere { center: Vec3f::new(-0.8, -1.5, 0.2), radius: 0.8 }, blue_diffuse);
+    scene.add_object(Sphere { center: Vec3f::new(1.0, -1.5, 0.0), radius: 0.6 }, golden_glossy);
 
-    scene.add_light(AreaLight::new(
-        Vec3f::new(-2.48, -2.47, 2.48), Vec3f::new(2.48, 2.47, -2.48), Vec3f::new(-2.48, 2.47, -2.48),
-        vec3_from_value(2.0)
-    ));
+    // scene.add_light(AreaLight::new(
+    //     Vec3f::new(-2.48, -2.47, 2.48), Vec3f::new(2.48, 2.47, -2.48), Vec3f::new(-2.48, 2.47, -2.48),
+    //     vec3_from_value(2.0)
+    // ));
 
     scene.add_light(PointLight {
-        position: Vec3f::new(0.0, 2.20, 0.0),
-        intensity: vec3_from_value(10.0)
+        position: Vec3f::new(0.0, 1.5, 0.0),
+        intensity: vec3_from_value(8.0)
     });
 
     let mut ren = CpuPathTracer::new(cam, scene);

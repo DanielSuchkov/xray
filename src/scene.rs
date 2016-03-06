@@ -1,9 +1,10 @@
 #![allow(dead_code)]
 use brdf::Material;
+use geometry;
 use geometry::{/*BSphere, */Geometry, GeometryManager, Ray, Surface, SurfaceIntersection};
 use light::{Light, BackgroundLight};
 use math::{vec3_from_value, Vec3f, EPS_RAY, One};
-// use math::vector_traits::*;
+use math::vector_traits::*;
 
 pub type MaterialID = i32;
 pub type LightID = i32;
@@ -47,8 +48,8 @@ impl<T> Scene for DefaultScene<T> where T: GeometryManager {
             materials: Vec::new(),
             lights: Vec::new(),
             backlight: BackgroundLight {
-                intensity: Vec3f::one() * 0.5,
-                scale: 0.0
+                intensity: Vec3f::one() * 0.1,
+                scale: 1.0
             }
         }
     }

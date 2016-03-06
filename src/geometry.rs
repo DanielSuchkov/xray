@@ -127,40 +127,42 @@ impl AABBox {
 
 impl Geometry for Sphere {
     fn intersect(&self, ray: &Ray) -> Option<Intersection> {
-        // we transform ray origin into object space (center == origin)
-        let local_origin = ray.orig - self.center;
+        let p = ray.orig - self.center;
 
-        let a = ray.dir.dot(&ray.dir) as f64;
-        let b = 2.0 * ray.dir.dot(&local_origin) as f64;
-        let c = (local_origin.dot(&local_origin) - self.r2()) as f64;
+        let r2 = self.r2();
+        let p_d = p.dot(&ray.dir);
 
-        // Must use f64, because when b ~ sqrt(b*b - 4*a*c)
-        // the resulting t is imprecise enough to get around ray epsilons
-        let disc: f64 = b * b - 4.0 * a * c;
-
-        if disc < 0.0 {
+        // The sphere is behind or surrounding the start point.
+        if p_d > 0.0 || p.dot(&p) < r2 {
             return None;
         }
 
-        let disc_sqrt = disc.sqrt();
-        let q = if b < 0.0 { (-b - disc_sqrt) / 2.0 } else { (-b + disc_sqrt) / 2.0 };
+        // Flatten p into the plane passing through c perpendicular to the ray.
+        // This gives the closest approach of the ray to the center.
+        let a = p - ray.dir * p_d;
 
-        let (t0, t1) = {
-            let (t0, t1) = (q / a, c / q);
-            if t0 > t1 { (t1, t0) } else { (t0, t1) }
-        };
+        let a2 = a.dot(&a);
 
-        let res_t = if t0 >= 0.0 {
-            t0 as f32
-        } else if t1 >= 0.0 {
-            t1 as f32
-        } else {
+        // Closest approach is outside the sphere.
+        if a2 > r2 {
             return None;
-        };
+        }
+
+        // Calculate distance from plane where ray enters/exits the sphere.
+        let h = (r2 - a2).sqrt();
+
+        // Calculate intersection point relative to sphere center.
+        let i = a - ray.dir * h;
+
+        let intersection = self.center + i;
+        let normal = i.normalize();
+        // We've taken a shortcut here to avoid a second square root.
+        // Note numerical errors can make the normal have length slightly different from 1.
+        // If you need higher precision, you may need to perform a conventional normalization.
 
         Some(Intersection {
-            normal: (local_origin + ray.dir * res_t).normalize(),
-            dist: res_t,
+            normal: normal,
+            dist: (intersection - ray.orig).norm(),
         })
     }
 
@@ -197,10 +199,15 @@ impl Geometry for Triangle {
 
         if ((v0d <= 0.0)  && (v1d <= 0.0)  && (v2d <= 0.0)) ||
            ((v0d >= 0.0) && (v1d >= 0.0) && (v2d >= 0.0)) {
-            Some(Intersection {
-                normal: self.normal,
-                dist: self.normal.dot(&ao) / self.normal.dot(&ray.dir),
-            })
+            let dist = self.normal.dot(&ao) / self.normal.dot(&ray.dir);
+            if dist <= 0.0 {
+                None
+            } else {
+                Some(Intersection {
+                    normal: self.normal,
+                    dist: dist,
+                })
+            }
         } else {
             None
         }
@@ -238,7 +245,9 @@ impl GeometryManager for GeometryList {
     fn was_occluded(&self, ray: &Ray, dist: f32) -> bool {
         self.geometries.iter()
             .map(|ref g| g.intersect(&ray))
-            .any(|isect| isect.map_or(false, |isec| isec.dist < dist))
+            .any(|isect| isect.map_or(false, |isec| {
+                isec.dist < dist
+            }))
     }
 
     fn add_geometry<G>(&mut self, object: G) where G: GeometrySurface + 'static {
@@ -297,5 +306,83 @@ impl Frame {
             y: v.dot(&self.oy),
             z: v.dot(&self.oz),
         }
+    }
+}
+
+mod tests {
+    use super::*;
+    use math::{Vec3f, EPS_RAY};
+    use scene::SurfaceProperties;
+
+    #[test]
+    fn occlusion_sphere() {
+        let mut geos = GeometryList::new();
+        let sphere = Sphere { center: Vec3f::new(0.0, 0.0, 0.0), radius: 2.0 };
+        geos.add_geometry(Surface { geometry: sphere, properties: SurfaceProperties::Material(0) });
+        let ray = Ray { orig: Vec3f::new(0.0, 0.0, -5.0), dir: Vec3f::new(0.0, 0.0, 1.0) };
+        assert!(geos.was_occluded(&ray, 4.0));
+        assert!(!geos.was_occluded(&ray, 3.0 - EPS_RAY));
+        assert!(geos.was_occluded(&ray, 3.0 + EPS_RAY));
+    }
+
+    #[test]
+    fn occlusion_sphere_on_surface() {
+        let mut geos = GeometryList::new();
+        let sphere = Sphere { center: Vec3f::new(0.0, 0.0, 0.0), radius: 2.0 };
+        geos.add_geometry(Surface { geometry: sphere, properties: SurfaceProperties::Material(0) });
+        let ray = Ray { orig: Vec3f::new(0.0, 0.0, -2.0), dir: Vec3f::new(0.0, 0.0, 1.0) };
+        assert!(geos.was_occluded(&ray, EPS_RAY));
+    }
+
+    #[test]
+    fn occlusion_sphere_near_surface() {
+        let mut geos = GeometryList::new();
+        let sphere = Sphere { center: Vec3f::new(0.0, 0.0, 0.0), radius: 2.0 };
+        geos.add_geometry(Surface { geometry: sphere, properties: SurfaceProperties::Material(0) });
+        let ray = Ray { orig: Vec3f::new(0.0, 0.0, -2.0 - EPS_RAY * 2.0), dir: Vec3f::new(0.0, 0.0, 1.0) };
+        assert!(!geos.was_occluded(&ray, EPS_RAY));
+    }
+
+    #[test]
+    fn occlusion_tri_sphere() {
+        let mut geos = GeometryList::new();
+        let ident_mat = SurfaceProperties::Material(0);
+        let sphere = Sphere { center: Vec3f::new(0.0, 0.0, 0.0), radius: 2.0 };
+        geos.add_geometry(Surface { geometry: sphere, properties: ident_mat });
+
+        let tri = Triangle::new(Vec3f::new(1.0, -1.0, -3.0) , Vec3f::new(-1.0, -1.0, -3.0), Vec3f::new(-1.0, 1.0, -3.0));
+        geos.add_geometry(Surface { geometry: tri, properties: ident_mat });
+
+        let ray = Ray { orig: Vec3f::new(0.0, 0.0, 2.1), dir: Vec3f::new(0.0, 0.0, 1.0) };
+        assert!(!geos.was_occluded(&ray, 0.01));
+
+        let ray_from_tri = Ray { orig: Vec3f::new(0.0, 0.0, -3.5), dir: Vec3f::new(0.0, 0.0, 1.0) };
+        assert!(geos.was_occluded(&ray_from_tri, 2.0));
+    }
+
+     #[test]
+    fn occlusion_tri() {
+        let mut geos = GeometryList::new();
+        let ident_mat = SurfaceProperties::Material(0);
+
+        let tri = Triangle::new(Vec3f::new(1.0, -1.0, -3.0) , Vec3f::new(-1.0, -1.0, -3.0), Vec3f::new(-1.0, 1.0, -3.0));
+        geos.add_geometry(Surface { geometry: tri, properties: ident_mat });
+
+        let ray = Ray { orig: Vec3f::new(0.0, 0.0, 2.1), dir: Vec3f::new(0.0, 0.0, 1.0) };
+        let was_occluded = if let Some(isect) = geos.nearest_intersection(&ray) {
+            println!("{:?}", isect.dist);
+            if isect.dist < 1.0 {
+                true
+            } else {
+                false
+            }
+        } else {
+            false
+        };
+
+        assert!(!was_occluded);
+
+        let ray_from_tri = Ray { orig: Vec3f::new(0.0, 0.0, -3.5), dir: Vec3f::new(0.0, 0.0, 1.0) };
+        assert!(geos.was_occluded(&ray_from_tri, 2.0));
     }
 }
