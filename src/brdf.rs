@@ -7,170 +7,62 @@ use std::ops::Add;
 
 #[derive(Debug, Clone, PartialEq, Copy)]
 pub struct Material {
-    pub lambert: Vec3f,
+    pub diffuse: Vec3f,
     pub specular: Vec3f,
     pub phong_exp: f32
 }
 
 #[derive(Debug, Clone)]
-pub struct LambertPhongBRDF {
+pub struct Brdf {
     material: Material,
-    frame: Frame,
-    local_dir_fix: Vec3f,
-    prob: Probabilities,
+    own_basis: Frame,
+    out_dir_local: Vec3f, // "out" in physical meaning, in fact - incoming
 }
 
-#[derive(Debug, Clone)]
-pub struct BrdfEval {
-    pub radiance: Vec3f,
-    pub dir_pdf_w: f32,
-}
-
-#[derive(Debug, Clone)]
-pub struct Sample {
-    pub factor: Vec3f,
-    pub dir: Vec3f,
-    pub pdf_w: f32
+pub struct BrdfSample {
+    pub in_dir_world: Vec3f, // "in" in physical meaning, i.e. from light to eye
+    pub cos_theta_in: f32,
+    pub radiance_factor: Vec3f,
 }
 
 #[derive(Debug, Clone)]
 struct Probabilities {
-    lambert: f32,
+    diffuse: f32,
     phong: f32,
     continuation: f32,
 }
 
-impl LambertPhongBRDF {
-    pub fn new(mat: Material, frame: Frame, ray: &Ray) -> Option<LambertPhongBRDF> {
-        let local_dir = frame.to_local(&-ray.dir);
-        let prob = Probabilities::new(&mat);
-        if local_dir.z.abs() < EPS_COSINE || prob.continuation == 0.0 {
+impl Brdf {
+    pub fn new(out_dir_world: &Vec3f, hit_normal: &Vec3f, material: &Material) -> Option<Brdf> {
+        let own_basis = Frame::from_z(hit_normal);
+        let out_dir_local = own_basis.to_local(&-*out_dir_world);
+        if out_dir_local.z < EPS_COSINE {
             None
         } else {
-            Some(LambertPhongBRDF { material: mat, local_dir_fix: local_dir, frame: frame, prob: prob })
-        }
-    }
-
-    pub fn evaluate(&self, world_dir_gen: &Vec3f) -> Option<(BrdfEval, f32)> {
-        let local_dir_gen = self.frame.to_local(world_dir_gen);
-        if local_dir_gen.z * self.local_dir_fix.z < EPS_COSINE {
-            None
-        } else {
-            let lambert = self.evaluate_lambert(&local_dir_gen);
-            let phong = self.evaluate_phong(&local_dir_gen);
-            Some((lambert + phong, local_dir_gen.z.abs()))
-        }
-    }
-
-    pub fn sample(&self, rands: (f32, f32, f32)) -> Option<(Sample, f32)> {
-        let mut sample = if rands.2 < self.prob.lambert {
-            self.sample_lambert((rands.0, rands.1)).map(|mut diff_sample| {
-                let phong_eval = self.evaluate_phong(&diff_sample.dir);
-                diff_sample.factor = diff_sample.factor + phong_eval.radiance;
-                diff_sample.pdf_w += phong_eval.dir_pdf_w;
-                diff_sample
-            })
-        } else {
-            self.sample_phong((rands.0, rands.1)).map(|mut phong_sample| {
-                let diff_eval = self.evaluate_lambert(&phong_sample.dir);
-                phong_sample.factor = phong_sample.factor + diff_eval.radiance;
-                phong_sample.pdf_w += diff_eval.dir_pdf_w;
-                phong_sample
-            })
-        };
-
-        match sample {
-            Some(ref mut sample) if sample.dir.z.abs() > EPS_COSINE => {
-                let cos_theta = sample.dir.z.abs();
-                sample.dir = self.frame.to_world(&sample.dir);
-                Some((sample.clone(), cos_theta))
-            },
-            _ => None
-        }
-    }
-
-    pub fn continuation_prob(&self) -> f32 {
-        self.prob.continuation
-    }
-
-    fn evaluate_lambert(&self, local_dir_gen: &Vec3f) -> BrdfEval {
-        if self.prob.lambert == 0.0 || self.local_dir_fix.z < EPS_COSINE || local_dir_gen.z < EPS_COSINE {
-            Zero::zero()
-        } else {
-            BrdfEval {
-                radiance: self.material.lambert * FRAC_1_PI,
-                dir_pdf_w: self.prob.lambert * (local_dir_gen.z * FRAC_1_PI).max(0.0)
-            }
-        }
-    }
-
-    fn evaluate_phong(&self, local_dir_gen: &Vec3f) -> BrdfEval {
-        let local_dir_gen = local_dir_gen.normalize();
-        if self.prob.phong == 0.0 || self.local_dir_fix.z < EPS_COSINE || local_dir_gen.z < EPS_COSINE {
-            Zero::zero()
-        } else {
-            let local_refl_fix = self.local_dir_fix.reflect_local();
-            let dot_refl_wi = local_refl_fix.dot(&local_dir_gen);
-            if dot_refl_wi < EPS_PHONG {
-                Zero::zero()
-            } else {
-                let pdf_w = cos_hemisphere_pow_pdf_w(&local_refl_fix, &local_dir_gen, self.material.phong_exp);
-                // let pdf_w = self.pdf_w_phong(&local_dir_gen);
-                let rho = self.material.specular * (self.material.phong_exp + 1.0) * 0.5 * FRAC_1_PI;
-                BrdfEval {
-                    radiance: rho * dot_refl_wi.powf(self.material.phong_exp),
-                    dir_pdf_w: pdf_w * self.prob.phong.max(0.9)
-                }
-            }
-        }
-    }
-
-    fn sample_lambert(&self, rands: (f32, f32)) -> Option<Sample> {
-        if self.local_dir_fix.z < EPS_COSINE {
-            None
-        } else {
-            let (local_dir, pdf_w) = cos_hemisphere_sample_w(rands);
-            Some(Sample {
-                factor: self.material.lambert * FRAC_1_PI,
-                dir: local_dir,
-                pdf_w: (pdf_w * self.prob.lambert).max(0.0)
+            Some(Brdf {
+                material: *material,
+                own_basis: own_basis,
+                out_dir_local: out_dir_local,
             })
         }
     }
 
-    fn sample_phong(&self, rands: (f32, f32)) -> Option<Sample> {
-        let (local_dir_gen, _) = cos_hemisphere_pow_sample_w(self.material.phong_exp, rands);
-        let local_dir_gen = local_dir_gen.normalize();
-        let local_refl_fix = self.local_dir_fix.reflect_local();
-        let local_dir_gen = {
-            let frame = Frame::from_z(local_refl_fix);
-            frame.to_world(&local_dir_gen).normalize()
-        };
-        let dot_refl_wi = local_refl_fix.dot(&local_dir_gen);
-        if dot_refl_wi < EPS_PHONG {
-            None
-        } else {
-            Some(Sample {
-                dir: local_dir_gen,
-                // pdf_w: self.pdf_w_phong(&local_dir_gen),
-                pdf_w: cos_hemisphere_pow_pdf_w(&local_refl_fix, &local_dir_gen, self.material.phong_exp),
-                factor: self.material.specular * (self.material.phong_exp + 1.0) * 0.5 * FRAC_1_PI
-            })
-        }
+    pub fn sample(&self, rnd: (f32, f32)) -> Option<BrdfSample> {
+        self.lambert_sample(rnd)
     }
 
-    fn pdf_w_phong(&self, local_dir: &Vec3f) -> f32 {
-        if self.prob.phong == 0.0 {
-            0.0
+    fn lambert_sample(&self, rnd: (f32, f32)) -> Option<BrdfSample> {
+        let in_dir_local = cos_hemisphere_sample_w(rnd);
+        let cos_theta_in = in_dir_local.z;
+        if cos_theta_in < EPS_COSINE {
+            None
         } else {
-            let local_refl_fix = self.local_dir_fix.reflect_local();
-            let dot_refl_wi = local_refl_fix.dot(local_dir);
-            if dot_refl_wi < EPS_COSINE {
-                0.0
-            } else {
-                let pdf_w = cos_hemisphere_pow_pdf_w(&local_refl_fix, local_dir, self.material.phong_exp);
-                pdf_w * self.prob.phong
-            }
+            let in_dir_world = self.own_basis.to_world(&in_dir_local);
+            Some(BrdfSample {
+                in_dir_world: in_dir_world,
+                cos_theta_in: cos_theta_in,
+                radiance_factor: self.material.diffuse * FRAC_1_PI
+            })
         }
     }
 }
@@ -178,14 +70,14 @@ impl LambertPhongBRDF {
 impl Material {
     pub fn new_identity() -> Material {
         Material {
-            lambert: Zero::zero(),
+            diffuse: Zero::zero(),
             specular: Zero::zero(),
             phong_exp: 0.0
         }
     }
 
-    fn albedo_lambert(&self) -> f32 {
-        luminance(&self.lambert)
+    fn albedo_diffuse(&self) -> f32 {
+        luminance(&self.diffuse)
     }
 
     fn albedo_specular(&self) -> f32 {
@@ -193,49 +85,26 @@ impl Material {
     }
 
     fn total_albedo(&self) -> f32 {
-        (self.albedo_specular() + self.albedo_lambert()).min(1.0)
-    }
-}
-
-impl Add for BrdfEval {
-    type Output = BrdfEval;
-    fn add(self, rhs: BrdfEval) -> BrdfEval {
-        BrdfEval {
-            radiance: self.radiance + rhs.radiance,
-            dir_pdf_w: self.dir_pdf_w + rhs.dir_pdf_w
-        }
-    }
-}
-
-impl Zero for BrdfEval {
-    fn zero() -> BrdfEval {
-        BrdfEval {
-            radiance: Zero::zero(),
-            dir_pdf_w: Zero::zero(),
-        }
-    }
-
-    fn is_zero(&self) -> bool {
-        self.radiance.is_zero()
+        (self.albedo_specular() + self.albedo_diffuse()).min(1.0)
     }
 }
 
 impl Probabilities {
     fn new(mat: &Material) -> Probabilities {
-        let albedo_lambert = mat.albedo_lambert();
+        let albedo_diffuse = mat.albedo_diffuse();
         let albedo_specular = mat.albedo_specular();
         let total_albedo = mat.total_albedo();
         if total_albedo < 1.0e-9 {
             Probabilities {
-                lambert: 0.0,
+                diffuse: 0.0,
                 phong: 0.0,
                 continuation: 0.0
             }
         } else {
             Probabilities {
-                lambert: albedo_lambert / total_albedo,
+                diffuse: albedo_diffuse / total_albedo,
                 phong: albedo_specular / total_albedo,
-                continuation: total_albedo//.min(1.0)
+                continuation: total_albedo
             }
         }
     }
@@ -246,51 +115,12 @@ fn luminance(a_rgb: &Vec3f) -> f32 {
     0.212671 * a_rgb.x + 0.715160 * a_rgb.y + 0.072169 * a_rgb.z
 }
 
-// returns vector and pdf
-pub fn cos_hemisphere_sample_w(rnd: (f32, f32)) -> (Vec3f, f32) {
+pub fn cos_hemisphere_sample_w(rnd: (f32, f32)) -> Vec3f { // -> (Vec3f, f32) {
     let phi = rnd.0 * 2.0 * PI;
     let costheta = rnd.1.sqrt();
     let sintheta = (1.0 - costheta * costheta).sqrt();
 
     let ret = Vec3f::new(sintheta * phi.cos(), sintheta * phi.sin(), costheta);
-    (ret, ret.z * FRAC_1_PI)
-}
-
-// returns vector and pdf
-pub fn cos_hemisphere_pow_sample_w(phong_exp: f32, rnd: (f32, f32)) -> (Vec3f, f32) {
-    let phi = rnd.0 * 2.0 * PI;
-    let costheta = rnd.1.powf(1.0 / (phong_exp + 1.0));
-    let sintheta = (1.0 - costheta * costheta).sqrt();
-
-    let ret = Vec3f::new(sintheta * phi.cos(), sintheta * phi.sin(), costheta);
-    (ret, (phong_exp + 1.0) * costheta.powf(phong_exp) * (0.5 * FRAC_1_PI))
-}
-
-pub fn uniform_triangle_sample(rnd: (f32, f32)) -> Vec2f {
-    let term = rnd.0.sqrt();
-    Vec2f::new(1.0 - term, rnd.1 * term)
-}
-
-pub fn uniform_sphere_sample_w(rnd: (f32, f32)) -> (Vec3f, f32) {
-    let phi = rnd.0 * 2.0 * PI;
-    let term2 = 2.0 * (rnd.1 - rnd.1 * rnd.1).sqrt();
-
-    (Vec3f::new(phi.cos() * term2, phi.sin() * term2, 1.0 - 2.0 * rnd.1), uniform_sphere_pdf_w())
-}
-
-pub fn cos_hemisphere_pow_pdf_w(normal: &Vec3f, dir: &Vec3f, phong_exp: f32) -> f32 {
-    let cos_theta = normal.dot(dir).max(0.0);
-    (phong_exp + 1.0) * cos_theta.powf(phong_exp) * (0.5 * FRAC_1_PI)
-}
-
-pub fn uniform_sphere_pdf_w() -> f32 {
-    0.25 * FRAC_1_PI
-}
-
-pub fn pdf_w_to_a(pdf_w: f32, dist: f32, cos_there: f32) -> f32 {
-    pdf_w * cos_there.abs() / (dist * dist)
-}
-
-pub fn pdf_a_to_w(pdf_a: f32, dist: f32, cos_there: f32) -> f32 {
-    pdf_a * (dist * dist) / cos_there.abs()
+    ret
+    // (ret, ret.z * FRAC_1_PI)
 }

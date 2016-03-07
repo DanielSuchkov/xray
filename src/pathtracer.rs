@@ -1,15 +1,13 @@
 #![allow(dead_code)]
-use brdf::{LambertPhongBRDF, pdf_a_to_w};
+use brdf::{Brdf};
 use camera::PerspectiveCamera;
 use framebuffer::FrameBuffer;
 use geometry::{Frame, Ray};
-use light::{Light, Radiance};
 use math::vector_traits::*;
 use math::{Vec2u, Vec3f, Vec2f, Zero, One, EPS_RAY, EPS_COSINE, vec3_from_value};
 use rand::{StdRng, Rng, SeedableRng};
 use render::Render;
 use scene::{Scene, SurfaceProperties};
-
 use nalgebra::ApproxEq;
 
 pub struct CpuPathTracer<S: Scene> {
@@ -19,20 +17,11 @@ pub struct CpuPathTracer<S: Scene> {
     rng: StdRng,
 }
 
-// fn mis(a_pdf: f32) -> f32 {
-//     a_pdf * a_pdf
-// }
-
-// // Mis weight for 2 pdfs
-// fn mis2(sample_pdf: f32, other_pdf: f32) -> f32 {
-//     (sample_pdf * other_pdf) / (mis(sample_pdf) + mis(other_pdf))
-// }
-
 // Power heuristic
-fn mis2(sample_pdf: f32, dir_pdf: f32) -> f32 {
-    let sample_pdf2 = sample_pdf * sample_pdf;
-    let dir_pdf2 = dir_pdf * dir_pdf;
-    (sample_pdf2) / (sample_pdf2 + dir_pdf2)
+fn mis2(brdf_pdf_w: f32, ligt_dir_pdf_w: f32) -> f32 {
+    let brdf_pdf_2 = brdf_pdf_w * brdf_pdf_w;
+    let light_dir_pdf_2 = ligt_dir_pdf_w * ligt_dir_pdf_w;
+    (brdf_pdf_2) / (brdf_pdf_2 + light_dir_pdf_2)
 }
 
 const MAX_PATH_LENGTH: u32 = 100;
@@ -50,8 +39,6 @@ impl<S> Render<S> for CpuPathTracer<S> where S: Scene {
     }
 
     fn iterate(&mut self, iter_nb: usize) {
-        let light_count = self.scene.get_lights_nb();
-        let light_pick_prob = 1.0 / light_count as f32;
         let res = self.camera.get_view_size();
         let (res_x, res_y) = (res.x as usize, res.y as usize);
         for pix_nb in 0..(res_x * res_y) {
@@ -63,110 +50,48 @@ impl<S> Render<S> for CpuPathTracer<S> where S: Scene {
             };
 
             let mut ray = self.camera.ray_from_screen(&sample);
-
+            let mut path_length = 0;
             let mut path_weight = Vec3f::one();
             let mut color = Vec3f::zero();
-            let mut path_lenght = 1;
-            let mut last_pdf_w = 1.0;
             'current_path: loop {
-                let isect = self.scene.nearest_intersection(&ray);
-                let mut isect = match isect {
-                    None => {
-                        let backlight = self.scene.get_background_light();
-                        let rad = match backlight.get_radiance(&ray.dir, &Zero::zero()) {
-                            None => break 'current_path,
-                            Some(rad) => rad
-                        };
-
-                        let mis_weight = if path_lenght > 1 {
-                            mis2(last_pdf_w, rad.dir_pdf_a * light_pick_prob)
-                        } else {
-                            1.0
-                        };
-
-                        color = color + path_weight * rad.intensity * mis_weight;
-                        break 'current_path;
-                    },
-                    Some(isect) => isect
+                let isect = if let Some(isect) = self.scene.nearest_intersection(&ray) {
+                    isect
+                } else {
+                    let backlight = self.scene.get_background_light();
+                    if let Some(rad) = backlight.radiate(&ray.dir, &Zero::zero()) {
+                        color = path_weight * rad.radiance;
+                    }
+                    break 'current_path;
                 };
-
-                let hit_point = ray.orig + ray.dir * isect.dist;
-                isect.dist += EPS_RAY;
-                let norm_frame = Frame::from_z(isect.normal);
+                let hit_pos = ray.orig + ray.dir * isect.dist;
                 let brdf_opt = match isect.surface {
                     SurfaceProperties::Material(mat_id) => {
-                        LambertPhongBRDF::new(*self.scene.get_material(mat_id), norm_frame, &ray)
+                        Brdf::new(&ray.dir, &isect.normal, self.scene.get_material(mat_id))
                     },
-                    SurfaceProperties::Light(light_id) => { // some geometry light DEAD CODE!
-                        let light = self.scene.get_light(light_id);
-                        if let Some(rad) = light.get_radiance(&ray.dir, &hit_point) {
-                            let mis_weight = if path_lenght > 1 {
-                                let cos_theta = norm_frame.to_local(&-ray.dir).z;
-                                let dir_pdf_w = pdf_a_to_w(rad.dir_pdf_a, isect.dist, cos_theta);
-                                mis2(last_pdf_w, dir_pdf_w * light_pick_prob)
-                            } else {
-                                1.0
-                            };
-                            color = color + path_weight * mis_weight * rad.intensity;
-                        }
-                        break 'current_path;
+                    SurfaceProperties::Light(_light_id) => {
+                        unimplemented!();
                     }
                 };
 
-                let brdf = match brdf_opt {
-                    Some(brdf) => brdf,
-                    None => break 'current_path
-                };
-
-                if brdf.continuation_prob() == 0.0 || path_lenght > MAX_PATH_LENGTH {
+                if path_length > MAX_PATH_LENGTH || path_weight.norm() < 1e-5 {
                     break 'current_path;
                 }
 
-                // next event estimation
-                let light_id = (self.rng.next_f32() * light_count as f32).floor() as i32;
-                let light = self.scene.get_light(light_id);
-                let rands = (self.rng.next_f32(), self.rng.next_f32());
-                if let Some(illum) = light.illuminate(&hit_point, rands) {
-                    if let Some((brdf_eval, cos_theta)) = brdf.evaluate(&illum.dir_to_light) {
-                        let mut brdf_pdf_w = brdf_eval.dir_pdf_w;
-                        let weight = if !light.is_delta() {
-                            brdf_pdf_w *= brdf.continuation_prob();
-                            mis2(illum.dir_pdf_w * light_pick_prob, brdf_pdf_w)
-                        } else {
-                            1.0
-                        };
-                        let conrib_radiance = (illum.intensity * brdf_eval.radiance)
-                            * (weight * cos_theta / (light_pick_prob * illum.dir_pdf_w));
-                        let ray_to_light = Ray { orig: hit_point, dir: illum.dir_to_light };
-                        if !self.scene.was_occluded(&ray_to_light, illum.dist_to_light) {
-                            color = color + conrib_radiance * path_weight;
-                        }
-                    }
-                }
+                let brdf = if let Some(brdf) = brdf_opt {
+                    brdf
+                } else {
+                    break 'current_path;
+                };
 
-                // calc next step
-                let rands = (self.rng.next_f32(), self.rng.next_f32(), self.rng.next_f32());
-                if let Some((mut sample, cos_theta)) = brdf.sample(rands) {
-                    if sample.dir.dot(&isect.normal) < EPS_COSINE {
-                        // he was bad sample he deserved to die
-                        break 'current_path;
-                    }
-                    let cont_prob = brdf.continuation_prob();
-                    last_pdf_w = sample.pdf_w * cont_prob;
-
-                    if cont_prob < 1.0 { // russian roulette
-                        if cont_prob < self.rng.next_f32() {
-                            break 'current_path;
-                        }
-                        sample.pdf_w *= cont_prob;
-                    }
-                    path_weight = path_weight * sample.factor * (cos_theta / sample.pdf_w);
-                    ray.dir = sample.dir;
-                    ray.orig = hit_point + sample.dir * EPS_RAY;
+                if let Some(sample) = brdf.sample((self.rng.next_f32(), self.rng.next_f32())) {
+                    path_weight = path_weight * sample.radiance_factor / sample.cos_theta_in;
+                    ray.dir = sample.in_dir_world;
+                    ray.orig = hit_pos + ray.dir * EPS_RAY;
                 } else {
                     break 'current_path;
                 }
-                path_lenght += 1;
+
+                path_length += 1;
             }
             self.frame.add_color((x, y), color);
         }

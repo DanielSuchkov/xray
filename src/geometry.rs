@@ -276,7 +276,7 @@ impl Frame {
         }
     }
 
-    pub fn from_z(oz: Vec3f) -> Frame {
+    pub fn from_z(oz: &Vec3f) -> Frame {
         let oz = oz.normalize();
         let temp_ox = ortho(&oz);
         let oy = oz.cross(&temp_ox).normalize();
