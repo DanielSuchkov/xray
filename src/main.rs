@@ -22,7 +22,7 @@ use camera::{PerspectiveCamera, CameraBuilder, Camera};
 use geometry::{GeometryList, Sphere, Triangle};
 use math::{Vec3f, Vec2u, One, Zero, vec3_from_value};
 use render::Render;
-use light::{AreaLight, PointLight};
+use light::{AreaLight, PointLight, BackgroundLight};
 use render::EyeLight;
 use pathtracer::CpuPathTracer;
 use scene::Scene;
@@ -44,8 +44,6 @@ fn main() {
             &ContextSettings::default())
         .expect("Cannot create a new Render Window.");
 
-    let mut scene = scene::DefaultScene::<GeometryList>::new();
-
     let cam = CameraBuilder::<PerspectiveCamera>::new()
         .with_view_size(res)
         .with_pos(Vec3f::new(0.0, 0.0, -8.6))
@@ -56,37 +54,42 @@ fn main() {
         .with_zfar(10000.0)
         .build();
 
-
     let white_diffuse = Material {
-        diffuse: vec3_from_value(0.99),
+        lambert: vec3_from_value(0.99),
         specular: Zero::zero(),
         phong_exp: 1.0
     };
 
     let green_diffuse = Material {
-        diffuse: Vec3f::new(0.156863, 0.803922, 0.172549),
-        // diffuse: Vec3f::new(0.0, 1.0, 0.0),
+        lambert: Vec3f::new(0.156863, 0.803922, 0.172549),
+        // lambert: Vec3f::new(0.0, 1.0, 0.0),
         specular: Zero::zero(),
         phong_exp: 1.0
     };
 
     let red_diffuse = Material {
-        diffuse: Vec3f::new(0.803922, 0.152941, 0.172549),
-        // diffuse: Vec3f::new(1.0, 0.0, 0.0),
+        lambert: Vec3f::new(0.803922, 0.152941, 0.172549),
+        // lambert: Vec3f::new(1.0, 0.0, 0.0),
         specular: Zero::zero(),
         phong_exp: 1.0
     };
 
     let blue_diffuse = Material {
-        diffuse: Vec3f::new(0.1, 0.9, 0.9),
-        specular: vec3_from_value(0.0),
+        lambert: Vec3f::new(0.1, 0.9, 0.9),
+        specular: Zero::zero(),
         phong_exp: 1.0
     };
 
-    let golden_glossy = Material {
-        diffuse: vec3_from_value(0.05),
-        specular: Vec3f::new(0.5, 0.5, 0.2),
-        phong_exp: 150.0
+    let margenta_diffuse = Material {
+        lambert: Vec3f::new(0.8, 0.2, 0.6),
+        specular: Zero::zero(),
+        phong_exp: 1.0
+    };
+
+    let dark_mirror = Material {
+        lambert: vec3_from_value(0.0), // Vec3f::new(0.5, 0.5, 0.2) * 0.7,
+        specular: vec3_from_value(0.50), // Vec3f::new(0.5, 0.5, 0.2) * 0.3,
+        phong_exp: 1000.0
     };
 
     let cb = [
@@ -99,6 +102,23 @@ fn main() {
         Vec3f::new( 2.5, -2.5,  2.5), // 6
         Vec3f::new(-2.5, -2.5,  2.5)  // 7
     ];
+
+    let daylight_color = Vec3f::new(0.65, 0.6, 0.45);
+    let mut scene = scene::DefaultScene::<GeometryList>::new(BackgroundLight {
+        intensity: daylight_color,
+        scale: 0.25
+    });
+
+    scene.add_light(AreaLight::new(
+        Vec3f::new(1.0, 2.48, -2.48), Vec3f::new(-1.0, -2.48, 2.48), Vec3f::new(-1.0, 2.48, -2.48),
+        daylight_color * 5.0
+    ));
+
+    // scene.add_light(PointLight {
+    //     position: Vec3f::new(0.0, 1.5, 0.0),
+    //     intensity: daylight_color * 8.0
+    // });
+
     {
         // floor
         scene.add_object(Triangle::new(cb[5], cb[4], cb[7]), white_diffuse);
@@ -121,18 +141,8 @@ fn main() {
         scene.add_object(Triangle::new(cb[6], cb[2], cb[1]), green_diffuse);
     }
 
-    scene.add_object(Sphere { center: Vec3f::new(-0.8, -1.5, 0.2), radius: 0.8 }, blue_diffuse);
-    scene.add_object(Sphere { center: Vec3f::new(1.0, -1.5, 0.0), radius: 0.6 }, golden_glossy);
-
-    // scene.add_light(AreaLight::new(
-    //     Vec3f::new(-2.48, -2.47, 2.48), Vec3f::new(2.48, 2.47, -2.48), Vec3f::new(-2.48, 2.47, -2.48),
-    //     vec3_from_value(2.0)
-    // ));
-
-    scene.add_light(PointLight {
-        position: Vec3f::new(0.0, 1.5, 0.0),
-        intensity: vec3_from_value(8.0)
-    });
+    scene.add_object(Sphere { center: Vec3f::new(-1.0, -1.7, 0.2), radius: 0.8 }, blue_diffuse);
+    scene.add_object(Sphere { center: Vec3f::new(1.0, -1.9, 0.0), radius: 0.6 }, dark_mirror);
 
     let mut ren = CpuPathTracer::new(cam, scene);
     let mut iter_nb = 0;

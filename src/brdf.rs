@@ -7,13 +7,13 @@ use std::ops::Add;
 
 #[derive(Debug, Clone, PartialEq, Copy)]
 pub struct Material {
-    pub diffuse: Vec3f,
+    pub lambert: Vec3f,
     pub specular: Vec3f,
     pub phong_exp: f32
 }
 
 #[derive(Debug, Clone)]
-pub struct Brdf {
+pub struct LambertPhongBRDF {
     material: Material,
     frame: Frame,
     local_dir_fix: Vec3f,
@@ -35,36 +35,36 @@ pub struct Sample {
 
 #[derive(Debug, Clone)]
 struct Probabilities {
-    diffuse: f32,
+    lambert: f32,
     phong: f32,
     continuation: f32,
 }
 
-impl Brdf {
-    pub fn new(mat: Material, frame: Frame, ray: &Ray) -> Option<Brdf> {
+impl LambertPhongBRDF {
+    pub fn new(mat: Material, frame: Frame, ray: &Ray) -> Option<LambertPhongBRDF> {
         let local_dir = frame.to_local(&-ray.dir);
         let prob = Probabilities::new(&mat);
         if local_dir.z.abs() < EPS_COSINE || prob.continuation == 0.0 {
             None
         } else {
-            Some(Brdf { material: mat, local_dir_fix: local_dir, frame: frame, prob: prob })
+            Some(LambertPhongBRDF { material: mat, local_dir_fix: local_dir, frame: frame, prob: prob })
         }
     }
 
     pub fn evaluate(&self, world_dir_gen: &Vec3f) -> Option<(BrdfEval, f32)> {
         let local_dir_gen = self.frame.to_local(world_dir_gen);
-        if local_dir_gen.z * self.local_dir_fix.z < 0.0 {
+        if local_dir_gen.z * self.local_dir_fix.z < EPS_COSINE {
             None
         } else {
-            let diffuse = self.evaluate_diffuse(&local_dir_gen);
+            let lambert = self.evaluate_lambert(&local_dir_gen);
             let phong = self.evaluate_phong(&local_dir_gen);
-            Some((diffuse + phong, local_dir_gen.z.abs()))
+            Some((lambert + phong, local_dir_gen.z.abs()))
         }
     }
 
     pub fn sample(&self, rands: (f32, f32, f32)) -> Option<(Sample, f32)> {
-        let mut sample = if rands.2 < self.prob.diffuse {
-            self.sample_diffuse((rands.0, rands.1)).map(|mut diff_sample| {
+        let mut sample = if rands.2 < self.prob.lambert {
+            self.sample_lambert((rands.0, rands.1)).map(|mut diff_sample| {
                 let phong_eval = self.evaluate_phong(&diff_sample.dir);
                 diff_sample.factor = diff_sample.factor + phong_eval.radiance;
                 diff_sample.pdf_w += phong_eval.dir_pdf_w;
@@ -72,7 +72,7 @@ impl Brdf {
             })
         } else {
             self.sample_phong((rands.0, rands.1)).map(|mut phong_sample| {
-                let diff_eval = self.evaluate_diffuse(&phong_sample.dir);
+                let diff_eval = self.evaluate_lambert(&phong_sample.dir);
                 phong_sample.factor = phong_sample.factor + diff_eval.radiance;
                 phong_sample.pdf_w += diff_eval.dir_pdf_w;
                 phong_sample
@@ -93,55 +93,58 @@ impl Brdf {
         self.prob.continuation
     }
 
-    fn evaluate_diffuse(&self, local_dir_gen: &Vec3f) -> BrdfEval {
-        if self.prob.diffuse == 0.0 {
+    fn evaluate_lambert(&self, local_dir_gen: &Vec3f) -> BrdfEval {
+        if self.prob.lambert == 0.0 || self.local_dir_fix.z < EPS_COSINE || local_dir_gen.z < EPS_COSINE {
             Zero::zero()
         } else {
             BrdfEval {
-                radiance: self.material.diffuse * FRAC_1_PI,
-                dir_pdf_w: self.prob.diffuse * (local_dir_gen.z * FRAC_1_PI).max(0.0)
+                radiance: self.material.lambert * FRAC_1_PI,
+                dir_pdf_w: self.prob.lambert * (local_dir_gen.z * FRAC_1_PI).max(0.0)
             }
         }
     }
 
     fn evaluate_phong(&self, local_dir_gen: &Vec3f) -> BrdfEval {
+        let local_dir_gen = local_dir_gen.normalize();
         if self.prob.phong == 0.0 || self.local_dir_fix.z < EPS_COSINE || local_dir_gen.z < EPS_COSINE {
             Zero::zero()
         } else {
             let local_refl_fix = self.local_dir_fix.reflect_local();
-            let dot_refl_wi = local_refl_fix.dot(local_dir_gen);
+            let dot_refl_wi = local_refl_fix.dot(&local_dir_gen);
             if dot_refl_wi < EPS_PHONG {
                 Zero::zero()
             } else {
-                let pdf_w = cos_hemisphere_pow_pdf_w(&local_refl_fix, local_dir_gen, self.material.phong_exp);
-                let rho = self.material.specular * (self.material.phong_exp + 2.0) * 0.5 * FRAC_1_PI;
+                let pdf_w = cos_hemisphere_pow_pdf_w(&local_refl_fix, &local_dir_gen, self.material.phong_exp);
+                // let pdf_w = self.pdf_w_phong(&local_dir_gen);
+                let rho = self.material.specular * (self.material.phong_exp + 1.0) * 0.5 * FRAC_1_PI;
                 BrdfEval {
                     radiance: rho * dot_refl_wi.powf(self.material.phong_exp),
-                    dir_pdf_w: pdf_w * self.prob.phong
+                    dir_pdf_w: pdf_w * self.prob.phong.max(0.9)
                 }
             }
         }
     }
 
-    fn sample_diffuse(&self, rands: (f32, f32)) -> Option<Sample> {
+    fn sample_lambert(&self, rands: (f32, f32)) -> Option<Sample> {
         if self.local_dir_fix.z < EPS_COSINE {
             None
         } else {
             let (local_dir, pdf_w) = cos_hemisphere_sample_w(rands);
             Some(Sample {
-                factor: self.material.diffuse * FRAC_1_PI,
+                factor: self.material.lambert * FRAC_1_PI,
                 dir: local_dir,
-                pdf_w: pdf_w * self.prob.diffuse
+                pdf_w: (pdf_w * self.prob.lambert).max(0.0)
             })
         }
     }
 
     fn sample_phong(&self, rands: (f32, f32)) -> Option<Sample> {
         let (local_dir_gen, _) = cos_hemisphere_pow_sample_w(self.material.phong_exp, rands);
+        let local_dir_gen = local_dir_gen.normalize();
         let local_refl_fix = self.local_dir_fix.reflect_local();
         let local_dir_gen = {
             let frame = Frame::from_z(local_refl_fix);
-            frame.to_world(&local_dir_gen)
+            frame.to_world(&local_dir_gen).normalize()
         };
         let dot_refl_wi = local_refl_fix.dot(&local_dir_gen);
         if dot_refl_wi < EPS_PHONG {
@@ -149,8 +152,9 @@ impl Brdf {
         } else {
             Some(Sample {
                 dir: local_dir_gen,
-                pdf_w: self.pdf_w_phong(&local_dir_gen),
-                factor: self.material.specular * (self.material.phong_exp + 2.0) * 0.5 * FRAC_1_PI
+                // pdf_w: self.pdf_w_phong(&local_dir_gen),
+                pdf_w: cos_hemisphere_pow_pdf_w(&local_refl_fix, &local_dir_gen, self.material.phong_exp),
+                factor: self.material.specular * (self.material.phong_exp + 1.0) * 0.5 * FRAC_1_PI
             })
         }
     }
@@ -174,14 +178,14 @@ impl Brdf {
 impl Material {
     pub fn new_identity() -> Material {
         Material {
-            diffuse: Zero::zero(),
+            lambert: Zero::zero(),
             specular: Zero::zero(),
             phong_exp: 0.0
         }
     }
 
-    fn albedo_diffuse(&self) -> f32 {
-        luminance(&self.diffuse)
+    fn albedo_lambert(&self) -> f32 {
+        luminance(&self.lambert)
     }
 
     fn albedo_specular(&self) -> f32 {
@@ -189,7 +193,7 @@ impl Material {
     }
 
     fn total_albedo(&self) -> f32 {
-        self.albedo_specular() + self.albedo_diffuse()
+        (self.albedo_specular() + self.albedo_lambert()).min(1.0)
     }
 }
 
@@ -218,18 +222,18 @@ impl Zero for BrdfEval {
 
 impl Probabilities {
     fn new(mat: &Material) -> Probabilities {
-        let albedo_diffuse = mat.albedo_diffuse();
+        let albedo_lambert = mat.albedo_lambert();
         let albedo_specular = mat.albedo_specular();
         let total_albedo = mat.total_albedo();
         if total_albedo < 1.0e-9 {
             Probabilities {
-                diffuse: 0.0,
+                lambert: 0.0,
                 phong: 0.0,
                 continuation: 0.0
             }
         } else {
             Probabilities {
-                diffuse: albedo_diffuse / total_albedo,
+                lambert: albedo_lambert / total_albedo,
                 phong: albedo_specular / total_albedo,
                 continuation: total_albedo//.min(1.0)
             }

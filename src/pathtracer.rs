@@ -1,11 +1,11 @@
 #![allow(dead_code)]
-use brdf::{Brdf, pdf_a_to_w};
+use brdf::{LambertPhongBRDF, pdf_a_to_w};
 use camera::PerspectiveCamera;
 use framebuffer::FrameBuffer;
 use geometry::{Frame, Ray};
 use light::{Light, Radiance};
 use math::vector_traits::*;
-use math::{Vec2u, Vec3f, Vec2f, Zero, One, EPS_RAY, vec3_from_value};
+use math::{Vec2u, Vec3f, Vec2f, Zero, One, EPS_RAY, EPS_COSINE, vec3_from_value};
 use rand::{StdRng, Rng, SeedableRng};
 use render::Render;
 use scene::{Scene, SurfaceProperties};
@@ -28,11 +28,11 @@ pub struct CpuPathTracer<S: Scene> {
 //     (sample_pdf * other_pdf) / (mis(sample_pdf) + mis(other_pdf))
 // }
 
-// Power heuristic (as I understand)
-fn mis2(pdf: f32, other_pdf: f32) -> f32 {
-    let pdf_2 = pdf * pdf;
-    let other_pdf_2 = other_pdf * other_pdf;
-    (pdf_2) / (pdf_2 + other_pdf_2)
+// Power heuristic
+fn mis2(sample_pdf: f32, dir_pdf: f32) -> f32 {
+    let sample_pdf2 = sample_pdf * sample_pdf;
+    let dir_pdf2 = dir_pdf * dir_pdf;
+    (sample_pdf2) / (sample_pdf2 + dir_pdf2)
 }
 
 const MAX_PATH_LENGTH: u32 = 100;
@@ -95,7 +95,7 @@ impl<S> Render<S> for CpuPathTracer<S> where S: Scene {
                 let norm_frame = Frame::from_z(isect.normal);
                 let brdf_opt = match isect.surface {
                     SurfaceProperties::Material(mat_id) => {
-                        Brdf::new(*self.scene.get_material(mat_id), norm_frame, &ray)
+                        LambertPhongBRDF::new(*self.scene.get_material(mat_id), norm_frame, &ray)
                     },
                     SurfaceProperties::Light(light_id) => { // some geometry light DEAD CODE!
                         let light = self.scene.get_light(light_id);
@@ -147,8 +147,13 @@ impl<S> Render<S> for CpuPathTracer<S> where S: Scene {
                 // calc next step
                 let rands = (self.rng.next_f32(), self.rng.next_f32(), self.rng.next_f32());
                 if let Some((mut sample, cos_theta)) = brdf.sample(rands) {
+                    if sample.dir.dot(&isect.normal) < EPS_COSINE {
+                        // he was bad sample he deserved to die
+                        break 'current_path;
+                    }
                     let cont_prob = brdf.continuation_prob();
                     last_pdf_w = sample.pdf_w * cont_prob;
+
                     if cont_prob < 1.0 { // russian roulette
                         if cont_prob < self.rng.next_f32() {
                             break 'current_path;

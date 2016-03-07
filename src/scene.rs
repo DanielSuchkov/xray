@@ -20,12 +20,9 @@ pub struct DefaultScene<T> where T: GeometryManager {
     geo: T,
     materials: Vec<Material>,
     lights: Vec<Box<Light>>,
-    backlight: BackgroundLight,
 }
 
 pub trait Scene {
-    fn new() -> Self;
-
     fn nearest_intersection(&self, ray: &Ray) -> Option<SurfaceIntersection>;
     fn was_occluded(&self, ray: &Ray, dist: f32) -> bool;
 
@@ -38,22 +35,10 @@ pub trait Scene {
     fn get_material(&self, m_id: MaterialID) -> &Material;
     fn get_light(&self, m_id: LightID) -> &Box<Light>;
     fn get_lights_nb(&self) -> usize;
-    fn get_background_light(&self) -> &BackgroundLight;
+    fn get_background_light(&self) -> &Box<Light>;
 }
 
 impl<T> Scene for DefaultScene<T> where T: GeometryManager {
-    fn new() -> DefaultScene<T> {
-        DefaultScene {
-            geo: T::new(),
-            materials: Vec::new(),
-            lights: Vec::new(),
-            backlight: BackgroundLight {
-                intensity: Vec3f::one() * 0.1,
-                scale: 1.0
-            }
-        }
-    }
-
     fn nearest_intersection(&self, ray: &Ray) -> Option<SurfaceIntersection> {
         self.geo.nearest_intersection(ray)
     }
@@ -99,10 +84,20 @@ impl<T> Scene for DefaultScene<T> where T: GeometryManager {
         self.lights.len()
     }
 
-    fn get_background_light(&self) -> &BackgroundLight {
-        &self.backlight
+    fn get_background_light(&self) -> &Box<Light> {
+        &self.lights[0]
     }
 
     // fn add_luminous_object<L, G>(&mut self, light: L, geo: G)
     //     where L: Light + 'static, G: Geometry + 'static;
+}
+
+impl<T: GeometryManager> DefaultScene<T> {
+    pub fn new(backlight: BackgroundLight) -> DefaultScene<T> {
+        DefaultScene {
+            geo: T::new(),
+            materials: Vec::new(),
+            lights: vec![Box::new(backlight)]
+        }
+    }
 }
