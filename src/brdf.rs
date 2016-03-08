@@ -61,7 +61,7 @@ impl Brdf {
             Some(BrdfSample {
                 in_dir_world: in_dir_world,
                 cos_theta_in: cos_theta_in,
-                radiance_factor: self.material.diffuse * FRAC_1_PI
+                radiance_factor: self.material.diffuse
             })
         }
     }

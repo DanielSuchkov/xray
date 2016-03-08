@@ -36,7 +36,7 @@ fn f32_to_u8(f: f32) -> u8 {
 // }
 
 fn main() {
-    let res = Vec2u::new(250, 250);
+    let res = Vec2u::new(1000, 1000);
     let mut window = RenderWindow::new(
             VideoMode::new_init(res.x as u32, res.y as u32, 32),
             "XRay",
@@ -105,7 +105,7 @@ fn main() {
 
     let daylight_color = Vec3f::new(0.65, 0.6, 0.45);
     let mut scene = scene::DefaultScene::<GeometryList>::new(
-        BackgroundLight { intensity: daylight_color, scale: 4.0 }
+        BackgroundLight { intensity: daylight_color, scale: 1.5 }
     );
 
     // scene.add_light(AreaLight::new(
@@ -140,8 +140,9 @@ fn main() {
         scene.add_object(Triangle::new(cb[6], cb[2], cb[1]), green_diffuse);
     }
 
-    scene.add_object(Sphere { center: Vec3f::new(-1.0, -1.4, 0.2), radius: 0.8 }, blue_diffuse);
-    scene.add_object(Sphere { center: Vec3f::new(1.0, -1.9, 0.0), radius: 0.6 }, margenta_diffuse);
+    scene.add_object(Sphere { center: Vec3f::new(0.3, -1.1, 0.45), radius: 0.7 }, white_diffuse);
+    scene.add_object(Sphere { center: Vec3f::new(-1.0, -1.7, 0.2), radius: 0.8 }, blue_diffuse);
+    scene.add_object(Sphere { center: Vec3f::new(1.2, -1.9, 0.0), radius: 0.6 }, margenta_diffuse);
 
     let mut ren = CpuPathTracer::new(cam, scene);
     let mut iter_nb = 0;
