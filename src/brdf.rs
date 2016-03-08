@@ -1,6 +1,7 @@
 #![allow(dead_code)]
 use math::{Vec3f, Vec2f, Zero, EPS_COSINE, EPS_PHONG};
 use math::vector_traits::*;
+use utility::{cos_hemisphere_sample_w, luminance};
 use std::f32::consts::{FRAC_1_PI, PI};
 use geometry::{Frame, Ray};
 use std::ops::Add;
@@ -23,6 +24,10 @@ pub struct BrdfSample {
     pub in_dir_world: Vec3f, // "in" in physical meaning, i.e. from light to eye
     pub cos_theta_in: f32,
     pub radiance_factor: Vec3f,
+}
+
+pub struct BrdfEval {
+    pub radiance: Vec3f,
 }
 
 #[derive(Debug, Clone)]
@@ -51,6 +56,11 @@ impl Brdf {
         self.lambert_sample(rnd)
     }
 
+    pub fn eval(&self, in_dir_world: &Vec3f) -> Option<BrdfEval> {
+        let in_dir_local = self.own_basis.to_local(in_dir_world);
+        self.lambert_eval(&in_dir_local)
+    }
+
     fn lambert_sample(&self, rnd: (f32, f32)) -> Option<BrdfSample> {
         let in_dir_local = cos_hemisphere_sample_w(rnd);
         let cos_theta_in = in_dir_local.z;
@@ -62,6 +72,16 @@ impl Brdf {
                 in_dir_world: in_dir_world,
                 cos_theta_in: cos_theta_in,
                 radiance_factor: self.material.diffuse
+            })
+        }
+    }
+
+    fn lambert_eval(&self, in_dir_local: &Vec3f) -> Option<BrdfEval> {
+        if in_dir_local.z <= 0.0 {
+            None
+        } else {
+            Some(BrdfEval {
+                radiance: self.material.diffuse * in_dir_local.z
             })
         }
     }
@@ -108,19 +128,4 @@ impl Probabilities {
             }
         }
     }
-}
-
-fn luminance(a_rgb: &Vec3f) -> f32 {
-    // a_rgb.x + a_rgb.y + a_rgb.z
-    0.212671 * a_rgb.x + 0.715160 * a_rgb.y + 0.072169 * a_rgb.z
-}
-
-pub fn cos_hemisphere_sample_w(rnd: (f32, f32)) -> Vec3f { // -> (Vec3f, f32) {
-    let phi = rnd.0 * 2.0 * PI;
-    let costheta = rnd.1.sqrt();
-    let sintheta = (1.0 - costheta * costheta).sqrt();
-
-    let ret = Vec3f::new(sintheta * phi.cos(), sintheta * phi.sin(), costheta);
-    ret
-    // (ret, ret.z * FRAC_1_PI)
 }

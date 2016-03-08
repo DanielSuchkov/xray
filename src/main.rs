@@ -13,6 +13,7 @@ pub mod math;
 pub mod pathtracer;
 pub mod render;
 pub mod scene;
+pub mod utility;
 
 use sfml::graphics::{RenderWindow, Color, RenderTarget, Texture, Sprite};
 use sfml::window::{VideoMode, ContextSettings, event, window_style};
@@ -74,8 +75,14 @@ fn main() {
         phong_exp: 1.0
     };
 
-    let blue_diffuse = Material {
+    let sky_blue_diffuse = Material {
         diffuse: Vec3f::new(0.1, 0.9, 0.9),
+        specular: Zero::zero(),
+        phong_exp: 1.0
+    };
+
+    let blue_diffuse = Material {
+        diffuse: Vec3f::new(0.2, 0.2, 0.8),
         specular: Zero::zero(),
         phong_exp: 1.0
     };
@@ -106,7 +113,7 @@ fn main() {
     let daylight_color = Vec3f::new(0.65, 0.6, 0.45);
     let evening_color = Vec3f::new(0.65, 0.55, 0.35);
     let mut scene = scene::DefaultScene::<GeometryList>::new(
-        BackgroundLight { intensity: evening_color, scale: 0.8 }
+        BackgroundLight { intensity: daylight_color, scale: 0.7 }
     );
 
     // scene.add_light(AreaLight::new(
@@ -114,15 +121,15 @@ fn main() {
     //     daylight_color * 5.0
     // ));
 
-    // scene.add_light(PointLight {
-    //     position: Vec3f::new(0.0, 1.5, 0.0),
-    //     intensity: daylight_color * 8.0
-    // });
+    scene.add_light(PointLight {
+        position: Vec3f::new(0.0, 2.4, 0.0),
+        intensity: daylight_color * 12.0
+    });
 
-    scene.add_luminous_object(PointLight {
-        position: Vec3f::new(0.0, 2.0, 0.0),
-        intensity: daylight_color * 15.0
-    }, Sphere { center: Vec3f::new(0.0, 2.5, 0.0), radius: 0.75 });
+    // scene.add_luminous_object(PointLight {
+    //     position: Vec3f::new(0.0, 2.0, 0.0),
+    //     intensity: daylight_color * 15.0
+    // }, Sphere { center: Vec3f::new(0.0, 2.5, 0.0), radius: 0.75 });
 
     {
         // floor
@@ -138,8 +145,8 @@ fn main() {
         scene.add_object(Triangle::new(cb[7], cb[3], cb[2]), white_diffuse);
 
         // left wall
-        scene.add_object(Triangle::new(cb[3], cb[7], cb[4]), red_diffuse);
-        scene.add_object(Triangle::new(cb[4], cb[0], cb[3]), red_diffuse);
+        scene.add_object(Triangle::new(cb[3], cb[7], cb[4]), blue_diffuse);
+        scene.add_object(Triangle::new(cb[4], cb[0], cb[3]), blue_diffuse);
 
         // right wall
         scene.add_object(Triangle::new(cb[1], cb[5], cb[6]), green_diffuse);
@@ -147,8 +154,8 @@ fn main() {
     }
 
     scene.add_object(Sphere { center: Vec3f::new(0.3, -1.1, 0.45), radius: 0.7 }, white_diffuse);
-    scene.add_object(Sphere { center: Vec3f::new(-1.0, -1.7, 0.2), radius: 0.8 }, blue_diffuse);
-    scene.add_object(Sphere { center: Vec3f::new(1.2, -1.9, 0.0), radius: 0.6 }, margenta_diffuse);
+    scene.add_object(Sphere { center: Vec3f::new(-1.0, -1.7, 0.2), radius: 0.8 }, white_diffuse);
+    scene.add_object(Sphere { center: Vec3f::new(1.2, -1.9, 0.0), radius: 0.6 }, sky_blue_diffuse);
 
     let mut ren = CpuPathTracer::new(cam, scene);
     let mut iter_nb = 0;

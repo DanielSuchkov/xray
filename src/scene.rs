@@ -27,14 +27,14 @@ pub trait Scene {
     fn was_occluded(&self, ray: &Ray, dist: f32) -> bool;
 
     fn add_object<G>(&mut self, geo: G, material: Material) where G: Geometry + 'static;
-    // fn add_light<L>(&mut self, light: L) where L: Light + 'static;
+    fn add_light<L>(&mut self, light: L) where L: Light + 'static;
     fn add_luminous_object<L, G>(&mut self, light: L, geo: G)
         where L: Light + 'static, G: Geometry + 'static;
 
     // fn bounding_sphere(&self) -> BSphere;
     fn get_material(&self, m_id: MaterialID) -> &Material;
     fn get_light(&self, m_id: LightID) -> &Box<Light>;
-    // fn get_lights_nb(&self) -> usize;
+    fn get_lights_nb(&self) -> usize;
     fn get_background_light(&self) -> &Box<Light>;
 }
 
@@ -72,17 +72,17 @@ impl<T> Scene for DefaultScene<T> where T: GeometryManager {
         &self.materials[m_id as usize]
     }
 
-    // fn add_light<L>(&mut self, light: L) where L: Light + 'static {
-    //     self.lights.push(Box::new(light));
-    // }
+    fn add_light<L>(&mut self, light: L) where L: Light + 'static {
+        self.lights.push(Box::new(light));
+    }
 
     fn get_light(&self, m_id: LightID) -> &Box<Light> {
         &self.lights[m_id as usize]
     }
 
-    // fn get_lights_nb(&self) -> usize {
-    //     self.lights.len()
-    // }
+    fn get_lights_nb(&self) -> usize {
+        self.lights.len()
+    }
 
     fn get_background_light(&self) -> &Box<Light> {
         &self.lights[0]
