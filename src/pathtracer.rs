@@ -40,6 +40,7 @@ impl<S> Render<S> for CpuPathTracer<S> where S: Scene {
 
     fn iterate(&mut self, iter_nb: usize) {
         let res = self.camera.get_view_size();
+        self.rng.reseed(&[iter_nb]);
         let (res_x, res_y) = (res.x as usize, res.y as usize);
         for pix_nb in 0..(res_x * res_y) {
             let (x, y) = (pix_nb % res_x, pix_nb / res_x);
@@ -58,30 +59,32 @@ impl<S> Render<S> for CpuPathTracer<S> where S: Scene {
                     isect
                 } else {
                     let backlight = self.scene.get_background_light();
-                    if let Some(rad) = backlight.radiate(&ray.dir, &Zero::zero()) {
+                    if let Some(rad) = backlight.radiate(&ray) {
                         color = path_weight * rad.radiance;
                     }
                     break 'current_path;
                 };
                 let hit_pos = ray.orig + ray.dir * isect.dist;
-                let brdf_opt = match isect.surface {
+                let brdf = match isect.surface {
                     SurfaceProperties::Material(mat_id) => {
-                        Brdf::new(&ray.dir, &isect.normal, self.scene.get_material(mat_id))
+                        if let Some(brdf) = Brdf::new(&ray.dir, &isect.normal, self.scene.get_material(mat_id)) {
+                            brdf
+                        } else {
+                            break 'current_path;
+                        }
                     },
-                    SurfaceProperties::Light(_light_id) => {
-                        unimplemented!();
+                    SurfaceProperties::Light(light_id) => {
+                        let light = self.scene.get_light(light_id);
+                        if let Some(rad) = light.radiate(&ray) {
+                            color = path_weight * rad.radiance;
+                        }
+                        break 'current_path;
                     }
                 };
 
-                if path_length > MAX_PATH_LENGTH || path_weight.norm() < 1e-5 {
+                if path_length > MAX_PATH_LENGTH || path_weight.sqnorm() < 1e-6 {
                     break 'current_path;
                 }
-
-                let brdf = if let Some(brdf) = brdf_opt {
-                    brdf
-                } else {
-                    break 'current_path;
-                };
 
                 if let Some(sample) = brdf.sample((self.rng.next_f32(), self.rng.next_f32())) {
                     path_weight = path_weight * sample.radiance_factor;

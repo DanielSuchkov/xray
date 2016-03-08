@@ -1,7 +1,7 @@
 #![allow(dead_code)]
 use math::{Vec3f, Zero, EPS_COSINE};
 use math::vector_traits::*;
-use geometry::{Frame};
+use geometry::{Frame, Geometry, Ray};
 use brdf;
 // use std::f32;
 
@@ -30,14 +30,22 @@ pub struct Radiation {
 }
 
 pub trait Light {
-    // out_dir - "out" in physical meaning, in trace from eye to light it's "incoming"
-    fn radiate(&self, out_dir: &Vec3f, hit_pnt: &Vec3f) -> Option<Radiation>;
+    // out_ray - "out" in physical meaning, in trace from eye to light it's "incoming"
+    fn radiate(&self, out_ray: &Ray) -> Option<Radiation>;
 }
 
 impl Light for BackgroundLight {
-    fn radiate(&self, _out_dir: &Vec3f, _hit_pnt: &Vec3f) -> Option<Radiation> {
+    fn radiate(&self, _out_ray: &Ray) -> Option<Radiation> {
         Some(Radiation {
             radiance: self.intensity * self.scale
+        })
+    }
+}
+
+impl Light for PointLight {
+    fn radiate(&self, _out_ray: &Ray) -> Option<Radiation> {
+        Some(Radiation {
+            radiance: self.intensity
         })
     }
 }
