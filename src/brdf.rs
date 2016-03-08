@@ -17,6 +17,7 @@ pub struct Brdf {
     material: Material,
     own_basis: Frame,
     out_dir_local: Vec3f, // "out" in physical meaning, in fact - incoming
+    prob: Probabilities
 }
 
 pub struct BrdfSample {
@@ -43,12 +44,18 @@ impl Brdf {
                 material: *material,
                 own_basis: own_basis,
                 out_dir_local: out_dir_local,
+                prob: Probabilities::new(material)
             })
         }
     }
 
-    pub fn sample(&self, rnd: (f32, f32)) -> Option<BrdfSample> {
-        self.lambert_sample(rnd)
+    pub fn sample(&self, rnd: (f32, f32, f32)) -> Option<BrdfSample> {
+        let sample_rnds = (rnd.1, rnd.2);
+        if rnd.0 < self.prob.diffuse {
+            self.lambert_sample(sample_rnds)
+        } else {
+            self.phong_sample(sample_rnds)
+        }
     }
 
     fn lambert_sample(&self, rnd: (f32, f32)) -> Option<BrdfSample> {
@@ -64,6 +71,24 @@ impl Brdf {
                 radiance_factor: self.material.diffuse
             })
         }
+    }
+
+    fn phong_sample(&self, rnd: (f32, f32)) -> Option<BrdfSample> {
+        // get dir around refl. dir, move it to normals basis and then move it to world coords
+        let in_dir_local_reflect = pow_cos_hemisphere_sample_w(self.material.phong_exp, rnd);
+        let reflect_dir = self.out_dir_local.reflect_local();
+        let reflect_basis = Frame::from_z(&reflect_dir);
+        let in_dir_local = reflect_basis.to_world(&in_dir_local_reflect);
+        let in_dir_world = self.own_basis.to_world(&in_dir_local);
+        // if in_dir_world.z < EPS_COSINE {
+        //     None
+        // } else {
+            Some(BrdfSample {
+                in_dir_world: in_dir_world,
+                cos_theta_in: in_dir_local.z,
+                radiance_factor: self.material.specular
+            })
+        // }
     }
 }
 
@@ -123,4 +148,13 @@ pub fn cos_hemisphere_sample_w(rnd: (f32, f32)) -> Vec3f { // -> (Vec3f, f32) {
     let ret = Vec3f::new(sintheta * phi.cos(), sintheta * phi.sin(), costheta);
     ret
     // (ret, ret.z * FRAC_1_PI)
+}
+
+pub fn pow_cos_hemisphere_sample_w(n: f32, rnd: (f32, f32)) -> Vec3f {
+    let phi = rnd.0 * 2.0 * PI;
+    let cos_theta = rnd.1.powf(1.0 / (n + 1.0));
+    let sin_theta = (1.0 - cos_theta * cos_theta).sqrt();
+    Vec3f {
+        x: phi.cos() * sin_theta, y: phi.sin() * sin_theta, z: cos_theta
+    }
 }

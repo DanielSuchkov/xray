@@ -59,9 +59,7 @@ impl<S> Render<S> for CpuPathTracer<S> where S: Scene {
                     isect
                 } else {
                     let backlight = self.scene.get_background_light();
-                    if let Some(rad) = backlight.radiate(&ray) {
-                        color = path_weight * rad.radiance;
-                    }
+                    backlight.radiate(&ray).map(|rad| color = path_weight * rad.radiance);
                     break 'current_path;
                 };
                 let hit_pos = ray.orig + ray.dir * isect.dist;
@@ -86,7 +84,8 @@ impl<S> Render<S> for CpuPathTracer<S> where S: Scene {
                     break 'current_path;
                 }
 
-                if let Some(sample) = brdf.sample((self.rng.next_f32(), self.rng.next_f32())) {
+                let sample_rnds = (self.rng.next_f32(), self.rng.next_f32(), self.rng.next_f32());
+                if let Some(sample) = brdf.sample(sample_rnds) {
                     path_weight = path_weight * sample.radiance_factor;
                     ray.dir = sample.in_dir_world;
                     ray.orig = hit_pos + ray.dir * EPS_RAY;

@@ -80,16 +80,28 @@ fn main() {
         phong_exp: 1.0
     };
 
-    let margenta_diffuse = Material {
-        diffuse: Vec3f::new(0.8, 0.2, 0.6),
-        specular: Zero::zero(),
-        phong_exp: 1.0
+    let golden_spec = Material {
+        diffuse: Vec3f::new(0.0, 0.0, 0.0),
+        specular: Vec3f::new(1.0, 0.7, 0.3),
+        phong_exp: 10.0
     };
 
-    let dark_mirror = Material {
+    let good_mirror = Material {
         diffuse: vec3_from_value(0.0), // Vec3f::new(0.5, 0.5, 0.2) * 0.7,
-        specular: vec3_from_value(0.50), // Vec3f::new(0.5, 0.5, 0.2) * 0.3,
+        specular: vec3_from_value(0.9), // Vec3f::new(0.5, 0.5, 0.2) * 0.3,
+        phong_exp: 1000000.0
+    };
+
+    let white_ceramics = Material {
+        diffuse: vec3_from_value(0.9),
+        specular: vec3_from_value(0.8),
         phong_exp: 1000.0
+    };
+
+    let steel = Material {
+        diffuse: vec3_from_value(0.1),
+        specular: vec3_from_value(0.55),
+        phong_exp: 100.0
     };
 
     let cb = [
@@ -106,7 +118,7 @@ fn main() {
     let daylight_color = Vec3f::new(0.65, 0.6, 0.45);
     let evening_color = Vec3f::new(0.65, 0.55, 0.35);
     let mut scene = scene::DefaultScene::<GeometryList>::new(
-        BackgroundLight { intensity: evening_color, scale: 0.8 }
+        BackgroundLight { intensity: evening_color, scale: 0.0 }
     );
 
     // scene.add_light(AreaLight::new(
@@ -121,7 +133,7 @@ fn main() {
 
     scene.add_luminous_object(PointLight {
         position: Vec3f::new(0.0, 2.0, 0.0),
-        intensity: daylight_color * 15.0
+        intensity: daylight_color * 20.0
     }, Sphere { center: Vec3f::new(0.0, 2.5, 0.0), radius: 0.75 });
 
     {
@@ -146,9 +158,9 @@ fn main() {
         scene.add_object(Triangle::new(cb[6], cb[2], cb[1]), green_diffuse);
     }
 
-    scene.add_object(Sphere { center: Vec3f::new(0.3, -1.1, 0.45), radius: 0.7 }, white_diffuse);
+    scene.add_object(Sphere { center: Vec3f::new(0.2, -1.0, 0.9), radius: 0.7 }, white_ceramics);
     scene.add_object(Sphere { center: Vec3f::new(-1.0, -1.7, 0.2), radius: 0.8 }, blue_diffuse);
-    scene.add_object(Sphere { center: Vec3f::new(1.2, -1.9, 0.0), radius: 0.6 }, margenta_diffuse);
+    scene.add_object(Sphere { center: Vec3f::new(1.3, -1.8, 0.5), radius: 0.7 }, golden_spec);
 
     let mut ren = CpuPathTracer::new(cam, scene);
     let mut iter_nb = 0;
