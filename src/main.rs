@@ -39,7 +39,7 @@ fn main() {
     let res = Vec2u::new(1000, 1000);
     let mut window = RenderWindow::new(
             VideoMode::new_init(res.x as u32, res.y as u32, 32),
-            "XRay",
+            "XRay-BRDF sampling",
             window_style::CLOSE,
             &ContextSettings::default())
         .expect("Cannot create a new Render Window.");
@@ -132,7 +132,7 @@ fn main() {
     // });
 
     scene.add_luminous_object(PointLight {
-        position: Vec3f::new(0.0, 2.0, 0.0),
+        position: Vec3f::new(0.0, 2.499, 0.0),
         intensity: daylight_color * 20.0
     }, Sphere { center: Vec3f::new(0.0, 2.5, 0.0), radius: 0.75 });
 
@@ -158,9 +158,9 @@ fn main() {
         scene.add_object(Triangle::new(cb[6], cb[2], cb[1]), green_diffuse);
     }
 
-    scene.add_object(Sphere { center: Vec3f::new(0.2, -1.0, 0.9), radius: 0.7 }, white_ceramics);
-    scene.add_object(Sphere { center: Vec3f::new(-1.0, -1.7, 0.2), radius: 0.8 }, blue_diffuse);
-    scene.add_object(Sphere { center: Vec3f::new(1.3, -1.8, 0.5), radius: 0.7 }, golden_spec);
+    scene.add_object(Sphere { center: Vec3f::new(0.3, -1.1, 0.45), radius: 0.7 }, white_diffuse);
+    scene.add_object(Sphere { center: Vec3f::new(-1.0, -1.7, 0.2), radius: 0.8 }, white_diffuse);
+    scene.add_object(Sphere { center: Vec3f::new(1.2, -1.9, 0.0), radius: 0.6 }, blue_diffuse);
 
     let mut ren = CpuPathTracer::new(cam, scene);
     let mut iter_nb = 0;
