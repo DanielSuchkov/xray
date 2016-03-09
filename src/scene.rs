@@ -2,9 +2,10 @@
 use brdf::Material;
 use geometry;
 use geometry::{/*BSphere, */Geometry, GeometryManager, Ray, Surface, SurfaceIntersection};
-use light::{Light, BackgroundLight};
+use light::{Light, BackgroundLight, LuminousObject, Luminous};
 use math::{vec3_from_value, Vec3f, EPS_RAY, One};
 use math::vector_traits::*;
+use std::rc::Rc;
 
 pub type MaterialID = i32;
 pub type LightID = i32;
@@ -28,8 +29,8 @@ pub trait Scene {
 
     fn add_object<G>(&mut self, geo: G, material: Material) where G: Geometry + 'static;
     fn add_light<L>(&mut self, light: L) where L: Light + 'static;
-    fn add_luminous_object<L, G>(&mut self, light: L, geo: G)
-        where L: Light + 'static, G: Geometry + 'static;
+    fn add_luminous_object<G>(&mut self, geo: G, intensity: Vec3f)
+        where G: Geometry + Luminous + Clone + 'static;
 
     // fn bounding_sphere(&self) -> BSphere;
     fn get_material(&self, m_id: MaterialID) -> &Material;
@@ -55,7 +56,7 @@ impl<T> Scene for DefaultScene<T> where T: GeometryManager {
         self.geo.add_geometry(Surface {
             geometry: geo,
             properties: SurfaceProperties::Material(material_id)
-        });
+        })
     }
 
     // fn bounding_sphere(&self) -> BSphere {
@@ -88,10 +89,10 @@ impl<T> Scene for DefaultScene<T> where T: GeometryManager {
         &self.lights[0]
     }
 
-    fn add_luminous_object<L, G>(&mut self, light: L, geo: G)
-        where L: Light + 'static,
-              G: Geometry + 'static {
+    fn add_luminous_object<G>(&mut self, geo: G, intensity: Vec3f)
+        where G: Geometry + Luminous + 'static + Clone {
         let light_id = self.lights.len() as i32;
+        let light = LuminousObject { object: geo.clone(), intensity: intensity };
         self.lights.push(Box::new(light));
         self.geo.add_geometry(Surface {
             geometry: geo,

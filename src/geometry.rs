@@ -3,6 +3,7 @@ use math::vector_traits::*;
 use math::{Vec3f, ortho, vec3_from_value};
 use scene::SurfaceProperties;
 use std::f32;
+use std::rc::Rc;
 
 #[derive(Debug, Clone, Copy)]
 pub struct SurfaceIntersection {

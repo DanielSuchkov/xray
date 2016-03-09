@@ -113,7 +113,7 @@ fn main() {
     let daylight_color = Vec3f::new(0.65, 0.6, 0.45);
     let evening_color = Vec3f::new(0.65, 0.55, 0.35);
     let mut scene = scene::DefaultScene::<GeometryList>::new(
-        BackgroundLight { intensity: daylight_color, scale: 0.7 }
+        BackgroundLight { intensity: daylight_color, scale: 0.0 }
     );
 
     // scene.add_light(AreaLight::new(
@@ -121,15 +121,15 @@ fn main() {
     //     daylight_color * 5.0
     // ));
 
-    scene.add_light(PointLight {
-        position: Vec3f::new(0.0, 2.4, 0.0),
-        intensity: daylight_color * 12.0
-    });
-
-    // scene.add_luminous_object(PointLight {
-    //     position: Vec3f::new(0.0, 2.0, 0.0),
+    // scene.add_light(PointLight {
+    //     position: Vec3f::new(0.0, 2.4, 0.0),
     //     intensity: daylight_color * 15.0
-    // }, Sphere { center: Vec3f::new(0.0, 2.5, 0.0), radius: 0.75 });
+    // });
+
+    scene.add_luminous_object(
+        Sphere { center: Vec3f::new(0.0, 2.5, 0.0), radius: 0.75 },
+        daylight_color * 10.0
+    );
 
     {
         // floor

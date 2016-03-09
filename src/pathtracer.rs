@@ -41,7 +41,6 @@ impl<S> Render<S> for CpuPathTracer<S> where S: Scene {
     fn iterate(&mut self, iter_nb: usize) {
         let res = self.camera.get_view_size();
         let lights_nb = self.scene.get_lights_nb();
-        let light_pick_prob = 1.0 / lights_nb as f32;
         // self.rng.reseed(&[iter_nb]); // i don't know is it necessary or not
         let (res_x, res_y) = (res.x as usize, res.y as usize);
         for pix_nb in 0..(res_x * res_y) {
@@ -74,19 +73,25 @@ impl<S> Render<S> for CpuPathTracer<S> where S: Scene {
                             break 'current_path;
                         }
                     },
-                    SurfaceProperties::Light(_light_id) => {
+                    SurfaceProperties::Light(light_id) => {
+                        if path_length == 0 {
+                            if let Some(rad) = self.scene.get_light(light_id).radiate(&ray) {
+                                color = rad.radiance;
+                            }
+                        }
                         break 'current_path;
                     }
                 };
 
-                let rand_light = self.scene.get_light((self.rng.next_f32() * lights_nb as f32) as i32);
-                // let rand_light = self.scene.get_light(1);
-                let rands = (self.rng.next_f32(), self.rng.next_f32());
-                if let Some(illum) = rand_light.illuminate(&hit_pos, rands) {
-                    if let Some(brdf_eval) = brdf.eval(&illum.dir_to_light) {
-                        let ray_to_light = Ray { orig: hit_pos, dir: illum.dir_to_light };
-                        if !self.scene.was_occluded(&ray_to_light, illum.dist_to_light) {
-                            color = color + illum.radiance * path_weight * brdf_eval.radiance;
+                for i in 0..lights_nb {
+                    let rand_light = self.scene.get_light(i as i32);
+                    let rands = (self.rng.next_f32(), self.rng.next_f32());
+                    if let Some(illum) = rand_light.illuminate(&hit_pos, rands) {
+                        if let Some(brdf_eval) = brdf.eval(&illum.dir_to_light) {
+                            let ray_to_light = Ray { orig: hit_pos, dir: illum.dir_to_light };
+                            if !self.scene.was_occluded(&ray_to_light, illum.dist_to_light) {
+                                color = color + illum.radiance * path_weight * brdf_eval.radiance;
+                            }
                         }
                     }
                 }
