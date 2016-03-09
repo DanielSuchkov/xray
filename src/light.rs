@@ -106,7 +106,7 @@ impl<L> Light for LuminousObject<L> where L: Luminous {
         let dist_sq = vec_to_light.sqnorm();
         let dist_to_light = dist_sq.sqrt();
         Some(Illumination {
-            radiance: self.intensity / dist_sq, //< am i need for it (../(r^2*pi)) or not?
+            radiance: self.intensity / dist_sq * (0.50 / FRAC_1_PI), //< am i need for it (../(r^2*pi)) or not?
             dir_to_light: vec_to_light / dist_to_light,
             dist_to_light: dist_to_light
         })

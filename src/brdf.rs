@@ -81,7 +81,7 @@ impl Brdf {
             None
         } else {
             Some(BrdfEval {
-                radiance: self.material.diffuse * in_dir_local.z
+                radiance: self.material.diffuse * in_dir_local.z * FRAC_1_PI
             })
         }
     }

@@ -128,7 +128,7 @@ fn main() {
 
     scene.add_luminous_object(
         Sphere { center: Vec3f::new(0.0, 2.5, 0.0), radius: 0.75 },
-        daylight_color * 10.0
+        daylight_color * 20.0
     );
 
     {
@@ -145,8 +145,8 @@ fn main() {
         scene.add_object(Triangle::new(cb[7], cb[3], cb[2]), white_diffuse);
 
         // left wall
-        scene.add_object(Triangle::new(cb[3], cb[7], cb[4]), blue_diffuse);
-        scene.add_object(Triangle::new(cb[4], cb[0], cb[3]), blue_diffuse);
+        scene.add_object(Triangle::new(cb[3], cb[7], cb[4]), red_diffuse);
+        scene.add_object(Triangle::new(cb[4], cb[0], cb[3]), red_diffuse);
 
         // right wall
         scene.add_object(Triangle::new(cb[1], cb[5], cb[6]), green_diffuse);
