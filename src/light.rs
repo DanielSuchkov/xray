@@ -4,7 +4,7 @@ use math::vector_traits::*;
 use geometry::{Frame, Geometry, Ray, Sphere};
 use utility::*;
 use brdf;
-use std::f32::consts::FRAC_1_PI;
+use std::f32::consts::{FRAC_1_PI, PI};
 use std::rc::Rc;
 // use std::f32;
 
@@ -44,7 +44,7 @@ pub trait Light {
 }
 
 pub trait Luminous {
-    fn emit_ray_orig(&self, hit_pnt: &Vec3f, rnd: (f32, f32)) -> Vec3f;
+    fn emit_ray_orig(&self, hit_pnt: &Vec3f, rnd: (f32, f32)) -> (Vec3f, f32);
 }
 
 impl Light for BackgroundLight {
@@ -84,12 +84,16 @@ impl Light for PointLight {
 }
 
 impl Luminous for Sphere {
-    fn emit_ray_orig(&self, hit_pnt: &Vec3f, rnd: (f32, f32)) -> Vec3f {
-        let local_dir = uniform_hemisphere_sample(rnd);
+    fn emit_ray_orig(&self, hit_pnt: &Vec3f, rnd: (f32, f32)) -> (Vec3f, f32) { // point, cos_alpha_max
+        let local_dir = cos_hemisphere_sample_w(rnd); // cause only a half of sphere is visible at once
+        // let local_dir = uniform_sphere_sample(rnd);
         let norm_to_disc = (*hit_pnt - self.center).normalize();
         let disc_basis = Frame::from_z(&norm_to_disc);
-        let pnt_on_sphere = disc_basis.to_world(&local_dir) * self.radius + self.center;
-        pnt_on_sphere
+        let ray_orig = disc_basis.to_world(&local_dir) * self.radius + self.center;
+        // let ray_orig = local_dir * self.radius + self.center;
+        let dist_sqr = (self.center - *hit_pnt).sqnorm();
+        let cos_alpha_max = self.r2() / dist_sqr;
+        (ray_orig, cos_alpha_max.abs())
     }
 }
 
@@ -101,13 +105,12 @@ impl<L> Light for LuminousObject<L> where L: Luminous {
     }
 
     fn illuminate(&self, hit_pnt: &Vec3f, rnd: (f32, f32)) -> Option<Illumination> {
-        let point_on_surface = self.object.emit_ray_orig(hit_pnt, rnd);
+        let (point_on_surface, cos_alpha_max) = self.object.emit_ray_orig(hit_pnt, rnd);
         let vec_to_light = point_on_surface - *hit_pnt;
-        let dist_sq = vec_to_light.sqnorm();
-        let dist_to_light = dist_sq.sqrt();
+        let dist_to_light = vec_to_light.norm();
         Some(Illumination {
-            radiance: self.intensity / dist_sq * (0.50 / FRAC_1_PI), //< am i need for it (../(r^2*pi)) or not?
-            dir_to_light: vec_to_light / dist_to_light,
+            radiance: self.intensity * cos_alpha_max,
+            dir_to_light: vec_to_light.normalize(),
             dist_to_light: dist_to_light
         })
     }

@@ -89,7 +89,27 @@ impl<S> Render<S> for CpuPathTracer<S> where S: Scene {
                     if let Some(illum) = rand_light.illuminate(&hit_pos, rands) {
                         if let Some(brdf_eval) = brdf.eval(&illum.dir_to_light) {
                             let ray_to_light = Ray { orig: hit_pos, dir: illum.dir_to_light };
-                            if !self.scene.was_occluded(&ray_to_light, illum.dist_to_light) {
+                            let was_occluded = {
+                                if let Some(isect) = self.scene.nearest_intersection(&ray_to_light) {
+                                    if isect.dist < illum.dist_to_light {
+                                        if let SurfaceProperties::Light(lid) = isect.surface {
+                                            if lid != i as i32 {
+                                                true
+                                            } else {
+                                                false
+                                            }
+                                        } else {
+                                            false
+                                        }
+                                    } else {
+                                        false
+                                    }
+                                } else {
+                                    false
+                                }
+                                // self.scene.was_occluded(&ray_to_light, illum.dist_to_light)
+                            };
+                            if !was_occluded {
                                 color = color + illum.radiance * path_weight * brdf_eval.radiance;
                             }
                         }

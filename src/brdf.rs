@@ -77,11 +77,11 @@ impl Brdf {
     }
 
     fn lambert_eval(&self, in_dir_local: &Vec3f) -> Option<BrdfEval> {
-        if in_dir_local.z <= 0.0 {
+        if in_dir_local.z < 0.0 {
             None
         } else {
             Some(BrdfEval {
-                radiance: self.material.diffuse * in_dir_local.z * FRAC_1_PI
+                radiance: self.material.diffuse * in_dir_local.z
             })
         }
     }
