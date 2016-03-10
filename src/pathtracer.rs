@@ -1,18 +1,19 @@
 #![allow(dead_code)]
-use brdf::{Brdf};
+// use brdf::{Brdf};
 use camera::PerspectiveCamera;
 use framebuffer::FrameBuffer;
-use geometry::{Frame, Ray};
+use geometry::{Frame, Ray, GeometryList, GeometryManager};
 use math::vector_traits::*;
 use math::{Vec2u, Vec3f, Vec2f, Zero, One, EPS_RAY, EPS_COSINE, vec3_from_value};
 use rand::{StdRng, Rng, SeedableRng};
 use render::Render;
-use scene::{Scene, SurfaceProperties};
+use scene::{/*Scene, */SurfaceProperties};
 use nalgebra::ApproxEq;
 
-pub struct CpuPathTracer<S: Scene> {
+pub struct CpuPathTracer/*<S: Scene>*/ {
     frame: FrameBuffer,
-    scene: S,
+    // scene: S,
+    geo: GeometryList,
     camera: PerspectiveCamera,
     rng: StdRng,
 }
@@ -26,14 +27,15 @@ fn mis2(brdf_pdf_w: f32, ligt_dir_pdf_w: f32) -> f32 {
 
 const MAX_PATH_LENGTH: u32 = 100;
 
-impl<S> Render<S> for CpuPathTracer<S> where S: Scene {
-    fn new(cam: PerspectiveCamera, scene: S) -> CpuPathTracer<S> {
+impl/*<S>*/ Render/*<S>*/ for CpuPathTracer/*<S> where S: Scene*/ {
+    fn new(cam: PerspectiveCamera/*, scene: S*/) -> CpuPathTracer/*<S>*/ {
         let resolution = cam.get_view_size();
         let resolution = Vec2u::new(resolution.x as usize, resolution.y as usize);
         CpuPathTracer {
             rng: StdRng::new().expect("cant create random generator"),
             camera: cam,
-            scene: scene,
+            geo: GeometryList::new(),
+            // scene: scene,
             frame: FrameBuffer::new(resolution),
         }
     }
@@ -55,45 +57,6 @@ impl<S> Render<S> for CpuPathTracer<S> where S: Scene {
             let mut path_weight = Vec3f::one();
             let mut color = Vec3f::zero();
             'current_path: loop {
-                let isect = if let Some(isect) = self.scene.nearest_intersection(&ray) {
-                    isect
-                } else {
-                    let backlight = self.scene.get_background_light();
-                    if let Some(rad) = backlight.radiate(&ray) {
-                        color = path_weight * rad.radiance;
-                    }
-                    break 'current_path;
-                };
-                let hit_pos = ray.orig + ray.dir * isect.dist;
-                let brdf = match isect.surface {
-                    SurfaceProperties::Material(mat_id) => {
-                        if let Some(brdf) = Brdf::new(&ray.dir, &isect.normal, self.scene.get_material(mat_id)) {
-                            brdf
-                        } else {
-                            break 'current_path;
-                        }
-                    },
-                    SurfaceProperties::Light(light_id) => {
-                        let light = self.scene.get_light(light_id);
-                        if let Some(rad) = light.radiate(&ray) {
-                            color = path_weight * rad.radiance;
-                        }
-                        break 'current_path;
-                    }
-                };
-
-                if path_length > MAX_PATH_LENGTH || path_weight.sqnorm() < 1e-6 {
-                    break 'current_path;
-                }
-
-                if let Some(sample) = brdf.sample((self.rng.next_f32(), self.rng.next_f32())) {
-                    path_weight = path_weight * sample.radiance_factor;
-                    ray.dir = sample.in_dir_world;
-                    ray.orig = hit_pos + ray.dir * EPS_RAY;
-                } else {
-                    break 'current_path;
-                }
-
                 path_length += 1;
             }
             self.frame.add_color((x, y), color);

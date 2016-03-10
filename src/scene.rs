@@ -2,7 +2,7 @@
 use brdf::Material;
 use geometry;
 use geometry::{/*BSphere, */Geometry, GeometryManager, Ray, Surface, SurfaceIntersection};
-use light::{Light, BackgroundLight};
+// use light::{Light, BackgroundLight};
 use math::{vec3_from_value, Vec3f, EPS_RAY, One};
 use math::vector_traits::*;
 
@@ -14,7 +14,7 @@ pub enum SurfaceProperties {
     Material(MaterialID),
     Light(LightID),
 }
-
+/*
 // #[derive(Debug, Clone)]
 pub struct DefaultScene<T> where T: GeometryManager {
     geo: T,
@@ -109,3 +109,4 @@ impl<T: GeometryManager> DefaultScene<T> {
         }
     }
 }
+*/

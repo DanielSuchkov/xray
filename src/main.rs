@@ -22,10 +22,10 @@ use camera::{PerspectiveCamera, CameraBuilder, Camera};
 use geometry::{GeometryList, Sphere, Triangle};
 use math::{Vec3f, Vec2u, One, Zero, vec3_from_value};
 use render::Render;
-use light::{/*AreaLight, */PointLight, BackgroundLight};
-use render::EyeLight;
+// use light::{/*AreaLight, */PointLight, BackgroundLight};
+// use render::EyeLight;
 use pathtracer::CpuPathTracer;
-use scene::Scene;
+// use scene::Scene;
 
 fn f32_to_u8(f: f32) -> u8 {
     (f.min(1.0) * 255.0) as u8
@@ -105,9 +105,9 @@ fn main() {
 
     let daylight_color = Vec3f::new(0.65, 0.6, 0.45);
     let evening_color = Vec3f::new(0.65, 0.55, 0.35);
-    let mut scene = scene::DefaultScene::<GeometryList>::new(
-        BackgroundLight { intensity: evening_color, scale: 0.8 }
-    );
+    // let mut scene = scene::DefaultScene::<GeometryList>::new(
+    //     BackgroundLight { intensity: evening_color, scale: 0.8 }
+    // );
 
     // scene.add_light(AreaLight::new(
     //     Vec3f::new(1.0, 2.48, -2.48), Vec3f::new(-1.0, -2.48, 2.48), Vec3f::new(-1.0, 2.48, -2.48),
@@ -119,38 +119,38 @@ fn main() {
     //     intensity: daylight_color * 8.0
     // });
 
-    scene.add_luminous_object(PointLight {
-        position: Vec3f::new(0.0, 2.0, 0.0),
-        intensity: daylight_color * 15.0
-    }, Sphere { center: Vec3f::new(0.0, 2.5, 0.0), radius: 0.75 });
+    // scene.add_luminous_object(PointLight {
+    //     position: Vec3f::new(0.0, 2.0, 0.0),
+    //     intensity: daylight_color * 15.0
+    // }, Sphere { center: Vec3f::new(0.0, 2.5, 0.0), radius: 0.75 });
 
-    {
-        // floor
-        scene.add_object(Triangle::new(cb[5], cb[4], cb[7]), white_diffuse);
-        scene.add_object(Triangle::new(cb[7], cb[6], cb[5]), white_diffuse);
+    // {
+    //     // floor
+    //     scene.add_object(Triangle::new(cb[5], cb[4], cb[7]), white_diffuse);
+    //     scene.add_object(Triangle::new(cb[7], cb[6], cb[5]), white_diffuse);
 
-        // ceiling
-        scene.add_object(Triangle::new(cb[2], cb[3], cb[0]), white_diffuse);
-        scene.add_object(Triangle::new(cb[0], cb[1], cb[2]), white_diffuse);
+    //     // ceiling
+    //     scene.add_object(Triangle::new(cb[2], cb[3], cb[0]), white_diffuse);
+    //     scene.add_object(Triangle::new(cb[0], cb[1], cb[2]), white_diffuse);
 
-        // back wall
-        scene.add_object(Triangle::new(cb[2], cb[6], cb[7]), white_diffuse);
-        scene.add_object(Triangle::new(cb[7], cb[3], cb[2]), white_diffuse);
+    //     // back wall
+    //     scene.add_object(Triangle::new(cb[2], cb[6], cb[7]), white_diffuse);
+    //     scene.add_object(Triangle::new(cb[7], cb[3], cb[2]), white_diffuse);
 
-        // left wall
-        scene.add_object(Triangle::new(cb[3], cb[7], cb[4]), red_diffuse);
-        scene.add_object(Triangle::new(cb[4], cb[0], cb[3]), red_diffuse);
+    //     // left wall
+    //     scene.add_object(Triangle::new(cb[3], cb[7], cb[4]), red_diffuse);
+    //     scene.add_object(Triangle::new(cb[4], cb[0], cb[3]), red_diffuse);
 
-        // right wall
-        scene.add_object(Triangle::new(cb[1], cb[5], cb[6]), green_diffuse);
-        scene.add_object(Triangle::new(cb[6], cb[2], cb[1]), green_diffuse);
-    }
+    //     // right wall
+    //     scene.add_object(Triangle::new(cb[1], cb[5], cb[6]), green_diffuse);
+    //     scene.add_object(Triangle::new(cb[6], cb[2], cb[1]), green_diffuse);
+    // }
 
-    scene.add_object(Sphere { center: Vec3f::new(0.3, -1.1, 0.45), radius: 0.7 }, white_diffuse);
-    scene.add_object(Sphere { center: Vec3f::new(-1.0, -1.7, 0.2), radius: 0.8 }, blue_diffuse);
-    scene.add_object(Sphere { center: Vec3f::new(1.2, -1.9, 0.0), radius: 0.6 }, margenta_diffuse);
+    // scene.add_object(Sphere { center: Vec3f::new(0.3, -1.1, 0.45), radius: 0.7 }, white_diffuse);
+    // scene.add_object(Sphere { center: Vec3f::new(-1.0, -1.7, 0.2), radius: 0.8 }, blue_diffuse);
+    // scene.add_object(Sphere { center: Vec3f::new(1.2, -1.9, 0.0), radius: 0.6 }, margenta_diffuse);
 
-    let mut ren = CpuPathTracer::new(cam, scene);
+    let mut ren = CpuPathTracer::new(cam/*, scene*/);
     let mut iter_nb = 0;
     let mut pixels = (0..(res.x * res.y * 4)).map(|_| 255u8).collect::<Vec<_>>();
 
