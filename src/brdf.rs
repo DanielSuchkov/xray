@@ -131,3 +131,10 @@ pub fn uniform_sphere_sample_w(rnd: (f32, f32)) -> Vec3f {
 
     Vec3f::new(phi.cos() * term2, phi.sin() * term2, 1.0 - 2.0 * rnd.1)
 }
+
+pub fn uniform_hemisphere_sample_w(rnd: (f32, f32)) -> Vec3f {
+    let phi = rnd.0 * 2.0 * PI;
+    let term2 = 2.0 * (rnd.1 - rnd.1 * rnd.1).sqrt();
+
+    Vec3f::new(phi.cos() * term2, phi.sin() * term2, rnd.1)
+}

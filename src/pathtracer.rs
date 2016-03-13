@@ -11,6 +11,7 @@ use rand::{StdRng, Rng, SeedableRng};
 use render::Render;
 use scene::{/*Scene, */SurfaceProperties};
 use nalgebra::ApproxEq;
+use std::f32::consts::{PI, FRAC_1_PI};
 
 pub struct CpuPathTracer/*<S: Scene>*/ {
     frame: FrameBuffer,
@@ -54,7 +55,7 @@ fn get_material(id: i32) -> Material {
 }
 
 fn get_light_color(_id: i32) -> Vec3f {
-    vec3_from_value(10.0)
+    vec3_from_value(4.0)
 }
 
 fn light_pos() -> Vec3f {
@@ -63,6 +64,15 @@ fn light_pos() -> Vec3f {
 
 fn radius() -> f32 {
     0.7
+}
+
+fn uniform_cone_sample(cos_a_max: f32, rnd: (f32, f32)) -> Vec3f {
+    let cos_a = 1.0 - rnd.0 * (1.0 - cos_a_max);
+    let sin_a = (1.0 - cos_a * cos_a).sqrt();
+    let phi = 2.0 * PI * rnd.1;
+    Vec3f {
+        x: phi.cos() * sin_a, y: phi.sin() * sin_a, z: cos_a
+    }
 }
 
 fn sample_brdf(norm: &Vec3f, rnd: (f32, f32)) -> Vec3f {
@@ -74,6 +84,22 @@ fn sample_brdf(norm: &Vec3f, rnd: (f32, f32)) -> Vec3f {
 fn sample_light(rnd: (f32, f32)) -> Vec3f {
     let dir = brdf::uniform_sphere_sample_w(rnd);
     dir * radius()
+}
+
+fn di(pnt: &Vec3f, norm: &Vec3f, lpnt: &Vec3f, radius: f32) -> f32 {
+    // calculate normalized light vector and distance to sphere light surface
+    let r = radius;
+    let ldir = *lpnt - *pnt;
+    let distance = ldir.norm();
+    let d = (distance - r).max(0.0);
+    let ldir = ldir / distance;
+
+    // calculate basic attenuation
+    let denom = d/r + 1.0;
+    let attenuation = 1.0 / (denom*denom);
+
+    let cos_theta = ldir.dot(&norm).max(0.0);
+    cos_theta * attenuation
 }
 
 impl/*<S>*/ Render/*<S>*/ for CpuPathTracer/*<S> where S: Scene*/ {
@@ -171,7 +197,7 @@ impl/*<S>*/ Render/*<S>*/ for CpuPathTracer/*<S> where S: Scene*/ {
             } else {
                 Vec2f::new(self.rng.next_f32(), self.rng.next_f32())
             };
-            let use_dl = false;
+            let use_dl = true;
             let mut ray = self.camera.ray_from_screen(&sample);
             let mut path_length = 0;
             let mut path_weight = Vec3f::one();
@@ -209,16 +235,42 @@ impl/*<S>*/ Render/*<S>*/ for CpuPathTracer/*<S> where S: Scene*/ {
 
                 if use_dl {
                     let rnds = (self.rng.next_f32(), self.rng.next_f32());
-                    let ld = sample_light(rnds) - ray.orig + light_pos();
-                    let nld = ld.normalize();
-                    if !self.geo.was_occluded(&Ray { orig: ray.orig, dir: nld }, ld.norm())
-                        || !self.geo.was_occluded(&Ray { orig: ray.orig, dir: nld }, ld.norm() - radius() * 2.0) {
-                        let l_to_pnt = light_pos() - ray.orig;
-                        let weight = radius() * radius() / l_to_pnt.sqnorm();
+
+                    let w = light_pos() - ray.orig;
+                    let w2 = w.sqnorm();
+                    let r2 = radius() * radius();
+                    let cos_a_max = (1.0 - (r2 / w2).min(1.0)).sqrt();
+                    let frac = 1.0 - cos_a_max;
+                    let omega = 2.0 /* * PI*/ * frac;
+                    let le = get_light_color(0)/* / (4.0 * PI * r2) * FRAC_1_PI*/;
+                    let ld = uniform_cone_sample(cos_a_max, rnds);
+                    let w_basis = Frame::from_z(&w);
+                    let ld = w_basis.to_world(&ld).normalize();
+                    let cos_theta = isect.normal.dot(&ld).abs().max(0.0);
+                    // let ldist = (/*ld * radius() + */light_pos() - ray.orig).norm();
+                    let shadow_ray = Ray { orig: ray.orig, dir: ld };
+                    // let lpnt = sample_light(rnds) + light_pos();
+                    // let ld = lpnt - ray.orig;
+                    // let nld = ld.normalize();
+                    // let shadow_ray = Ray { orig: hit_point + ld * EPS_RAY, dir: ld };
+                    let was_occluded = if let Some(is) = self.geo.nearest_intersection(&shadow_ray) {
+                        match is.surface {
+                            SurfaceProperties::Light(_id) => false,
+                            _ => true
+                        }
+                    } else {
+                        false
+                    };
+                    if !was_occluded {
+                    // if !self.geo.was_occluded(&shadow_ray, ldist) {
+                        color = color + le * path_weight/* * FRAC_1_PI*/ * cos_theta * omega;
+/*                        let l_to_pnt = light_pos() - ray.orig;
+                        let term = (1.0 - radius() * radius() / ld.sqnorm()).sqrt().max(0.0).min(1.0);
+                        let weight = 2.0 * (1.0 - term);
                         let cos_theta = nld.dot(&isect.normal);
                         if cos_theta > 0.0 {
-                            color = color + path_weight * get_light_color(0) * weight * cos_theta;
-                        }
+                            color = color + path_weight * get_light_color(0) * di(&hit_point, &isect.normal, &lpnt, radius());
+                        }*/
                     }
                 }
 
