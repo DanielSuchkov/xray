@@ -86,22 +86,6 @@ fn sample_light(rnd: (f32, f32)) -> Vec3f {
     dir * radius()
 }
 
-fn di(pnt: &Vec3f, norm: &Vec3f, lpnt: &Vec3f, radius: f32) -> f32 {
-    // calculate normalized light vector and distance to sphere light surface
-    let r = radius;
-    let ldir = *lpnt - *pnt;
-    let distance = ldir.norm();
-    let d = (distance - r).max(0.0);
-    let ldir = ldir / distance;
-
-    // calculate basic attenuation
-    let denom = d/r + 1.0;
-    let attenuation = 1.0 / (denom*denom);
-
-    let cos_theta = ldir.dot(&norm).max(0.0);
-    cos_theta * attenuation
-}
-
 impl/*<S>*/ Render/*<S>*/ for CpuPathTracer/*<S> where S: Scene*/ {
     fn new(cam: PerspectiveCamera/*, scene: S*/) -> CpuPathTracer/*<S>*/ {
         let resolution = cam.get_view_size();
@@ -241,7 +225,7 @@ impl/*<S>*/ Render/*<S>*/ for CpuPathTracer/*<S> where S: Scene*/ {
                     let r2 = radius() * radius();
                     let cos_a_max = (1.0 - (r2 / w2).min(1.0)).sqrt();
                     let frac = 1.0 - cos_a_max;
-                    let omega = 2.0 /* * PI*/ * frac;
+                    let omega = 2.0 * PI * frac;
                     let le = get_light_color(0)/* / (4.0 * PI * r2) * FRAC_1_PI*/;
                     let ld = uniform_cone_sample(cos_a_max, rnds);
                     let w_basis = Frame::from_z(&w);
@@ -263,7 +247,7 @@ impl/*<S>*/ Render/*<S>*/ for CpuPathTracer/*<S> where S: Scene*/ {
                     };
                     if !was_occluded {
                     // if !self.geo.was_occluded(&shadow_ray, ldist) {
-                        color = color + le * path_weight/* * FRAC_1_PI*/ * cos_theta * omega;
+                        color = color + le * path_weight * FRAC_1_PI * cos_theta * omega;
 /*                        let l_to_pnt = light_pos() - ray.orig;
                         let term = (1.0 - radius() * radius() / ld.sqnorm()).sqrt().max(0.0).min(1.0);
                         let weight = 2.0 * (1.0 - term);
