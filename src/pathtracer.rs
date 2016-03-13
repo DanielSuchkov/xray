@@ -45,11 +45,11 @@ impl<S> Render<S> for CpuPathTracer<S> where S: Scene {
         let (res_x, res_y) = (res.x as usize, res.y as usize);
         for pix_nb in 0..(res_x * res_y) {
             let (x, y) = (pix_nb % res_x, pix_nb / res_x);
-            let sample = Vec2f::new(x as f32, y as f32) + if iter_nb == 0 {
-                Vec2f::new(0.5, 0.5)
-            } else {
+            let jitter = if iter_nb == 0 { Vec2f::new(0.5, 0.5) } else {
                 Vec2f::new(self.rng.next_f32(), self.rng.next_f32())
             };
+
+            let sample = Vec2f::new(x as f32, y as f32) + jitter;
 
             let mut ray = self.camera.ray_from_screen(&sample);
             let mut path_length = 0;
@@ -60,14 +60,17 @@ impl<S> Render<S> for CpuPathTracer<S> where S: Scene {
                     isect
                 } else {
                     if let Some(back_rad) = self.scene.get_background_light().radiate(&ray) {
-                        color = color + path_weight * back_rad.radiance;
+                        if path_length == 0 {
+                            color = back_rad.radiance;
+                        }
                     }
                     break 'current_path;
                 };
                 let hit_pos = ray.orig + ray.dir * isect.dist;
                 let brdf = match isect.surface {
                     SurfaceProperties::Material(mat_id) => {
-                        if let Some(brdf) = Brdf::new(&ray.dir, &isect.normal, self.scene.get_material(mat_id)) {
+                        let material = self.scene.get_material(mat_id);
+                        if let Some(brdf) = Brdf::new(&ray.dir, &isect.normal, material) {
                             brdf
                         } else {
                             break 'current_path;
@@ -87,29 +90,9 @@ impl<S> Render<S> for CpuPathTracer<S> where S: Scene {
                     let rand_light = self.scene.get_light(i as i32);
                     let rands = (self.rng.next_f32(), self.rng.next_f32());
                     if let Some(illum) = rand_light.illuminate(&hit_pos, rands) {
-                        if let Some(brdf_eval) = brdf.eval(&illum.dir_to_light) {
-                            let ray_to_light = Ray { orig: hit_pos, dir: illum.dir_to_light };
-                            let was_occluded = {
-                                if let Some(isect) = self.scene.nearest_intersection(&ray_to_light) {
-                                    if isect.dist < illum.dist_to_light {
-                                        if let SurfaceProperties::Light(lid) = isect.surface {
-                                            if lid != i as i32 {
-                                                true
-                                            } else {
-                                                false
-                                            }
-                                        } else {
-                                            false
-                                        }
-                                    } else {
-                                        false
-                                    }
-                                } else {
-                                    false
-                                }
-                                // self.scene.was_occluded(&ray_to_light, illum.dist_to_light)
-                            };
-                            if !was_occluded {
+                        if let Some(brdf_eval) = brdf.eval(&illum.l_dir) {
+                            let shadow_ray = Ray { orig: hit_pos, dir: illum.l_dir };
+                            if !self.scene.was_occluded(&shadow_ray, illum.l_dist) {
                                 color = color + illum.radiance * path_weight * brdf_eval.radiance;
                             }
                         }
@@ -128,7 +111,9 @@ impl<S> Render<S> for CpuPathTracer<S> where S: Scene {
                     break 'current_path;
                 }
 
-                if path_weight.norm() < self.rng.next_f32() { // russian roulette
+                // use here only |path_weight|^2 while implementing new features, 'cause it's
+                // affects result. i need reproducible results (for comparation with reference)
+                if path_weight.sqnorm() < self.rng.next_f32() { // russian roulette
                     break 'current_path;
                 }
 

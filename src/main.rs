@@ -127,33 +127,34 @@ fn main() {
     // });
 
     scene.add_luminous_object(
-        Sphere { center: Vec3f::new(0.0, 1.5, 0.0), radius: 0.75 },
-        daylight_color * 4.0
+        Sphere { center: Vec3f::new(0.0, 1.7, 0.0), radius: 0.7 },
+        // daylight_color * 4.0
+        vec3_from_value(10.0)
     );
 
     {
         // // floor
-        // scene.add_object(Triangle::new(cb[5], cb[4], cb[7]), white_diffuse);
-        // scene.add_object(Triangle::new(cb[7], cb[6], cb[5]), white_diffuse);
+        scene.add_object(Triangle::new(cb[5], cb[4], cb[7]), white_diffuse);
+        scene.add_object(Triangle::new(cb[7], cb[6], cb[5]), white_diffuse);
 
         // ceiling
         scene.add_object(Triangle::new(cb[2], cb[3], cb[0]), white_diffuse);
         scene.add_object(Triangle::new(cb[0], cb[1], cb[2]), white_diffuse);
 
-        // // back wall
-        // scene.add_object(Triangle::new(cb[2], cb[6], cb[7]), white_diffuse);
-        // scene.add_object(Triangle::new(cb[7], cb[3], cb[2]), white_diffuse);
+        // back wall
+        scene.add_object(Triangle::new(cb[2], cb[6], cb[7]), white_diffuse);
+        scene.add_object(Triangle::new(cb[7], cb[3], cb[2]), white_diffuse);
 
-        // // left wall
-        // scene.add_object(Triangle::new(cb[3], cb[7], cb[4]), red_diffuse);
-        // scene.add_object(Triangle::new(cb[4], cb[0], cb[3]), red_diffuse);
+        // left wall
+        scene.add_object(Triangle::new(cb[3], cb[7], cb[4]), red_diffuse);
+        scene.add_object(Triangle::new(cb[4], cb[0], cb[3]), red_diffuse);
 
-        // // right wall
-        // scene.add_object(Triangle::new(cb[1], cb[5], cb[6]), green_diffuse);
-        // scene.add_object(Triangle::new(cb[6], cb[2], cb[1]), green_diffuse);
+        // right wall
+        scene.add_object(Triangle::new(cb[1], cb[5], cb[6]), green_diffuse);
+        scene.add_object(Triangle::new(cb[6], cb[2], cb[1]), green_diffuse);
     }
 
-    // scene.add_object(Sphere { center: Vec3f::new(0.3, -1.1, 0.45), radius: 0.7 }, white_diffuse);
+    scene.add_object(Sphere { center: Vec3f::new(0.3, -1.1, 0.45), radius: 0.7 }, white_diffuse);
     // scene.add_object(Sphere { center: Vec3f::new(-1.0, -1.7, 0.2), radius: 0.8 }, white_diffuse);
     // scene.add_object(Sphere { center: Vec3f::new(1.2, -1.9, 0.0), radius: 0.6 }, sky_blue_diffuse);
 
