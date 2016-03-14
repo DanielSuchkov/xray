@@ -93,8 +93,8 @@ fn main() {
     };
 
     let white_ceramics = Material {
-        diffuse: vec3_from_value(0.9),
-        specular: vec3_from_value(0.8),
+        diffuse: vec3_from_value(0.99),
+        specular: vec3_from_value(0.5),
         phong_exp: 1000.0
     };
 
@@ -132,9 +132,9 @@ fn main() {
     // });
 
     scene.add_luminous_object(PointLight {
-        position: Vec3f::new(0.0, 2.499, 0.0),
-        intensity: daylight_color * 20.0
-    }, Sphere { center: Vec3f::new(0.0, 2.5, 0.0), radius: 0.75 });
+        position: Vec3f::new(0.0, 1.7, 0.0),
+        intensity: vec3_from_value(10.0)//daylight_color * 4.0
+    }, Sphere { center: Vec3f::new(0.0, 1.7, 0.0), radius: 0.7 });
 
     {
         // floor
@@ -159,7 +159,7 @@ fn main() {
     }
 
     scene.add_object(Sphere { center: Vec3f::new(0.3, -1.1, 0.45), radius: 0.7 }, white_diffuse);
-    scene.add_object(Sphere { center: Vec3f::new(-1.0, -1.7, 0.2), radius: 0.8 }, white_diffuse);
+    scene.add_object(Sphere { center: Vec3f::new(-1.0, -1.7, 0.2), radius: 0.8 }, white_ceramics);
     scene.add_object(Sphere { center: Vec3f::new(1.2, -1.9, 0.0), radius: 0.6 }, blue_diffuse);
 
     let mut ren = CpuPathTracer::new(cam, scene);

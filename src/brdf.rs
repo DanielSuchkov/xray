@@ -51,7 +51,7 @@ impl Brdf {
 
     pub fn sample(&self, rnd: (f32, f32, f32)) -> Option<BrdfSample> {
         let sample_rnds = (rnd.1, rnd.2);
-        if rnd.0 < self.prob.diffuse {
+        if rnd.0 <= self.prob.diffuse {
             self.lambert_sample(sample_rnds)
         } else {
             self.phong_sample(sample_rnds)
@@ -110,7 +110,7 @@ impl Material {
     }
 
     fn total_albedo(&self) -> f32 {
-        (self.albedo_specular() + self.albedo_diffuse()).min(1.0)
+        (self.albedo_specular() + self.albedo_diffuse())
     }
 }
 
@@ -129,15 +129,15 @@ impl Probabilities {
             Probabilities {
                 diffuse: albedo_diffuse / total_albedo,
                 phong: albedo_specular / total_albedo,
-                continuation: total_albedo
+                continuation: total_albedo.min(1.0)
             }
         }
     }
 }
 
 fn luminance(a_rgb: &Vec3f) -> f32 {
-    // a_rgb.x + a_rgb.y + a_rgb.z
-    0.212671 * a_rgb.x + 0.715160 * a_rgb.y + 0.072169 * a_rgb.z
+    a_rgb.x + a_rgb.y + a_rgb.z
+    // 0.212671 * a_rgb.x + 0.715160 * a_rgb.y + 0.072169 * a_rgb.z
 }
 
 pub fn cos_hemisphere_sample_w(rnd: (f32, f32)) -> Vec3f { // -> (Vec3f, f32) {
@@ -156,5 +156,14 @@ pub fn pow_cos_hemisphere_sample_w(n: f32, rnd: (f32, f32)) -> Vec3f {
     let sin_theta = (1.0 - cos_theta * cos_theta).sqrt();
     Vec3f {
         x: phi.cos() * sin_theta, y: phi.sin() * sin_theta, z: cos_theta
+    }
+}
+
+pub fn uniform_hemisphere_sample(rnd: (f32, f32)) -> Vec3f {
+    let phi = rnd.0 * 2.0 * PI;
+    let cos_2theta = rnd.1;
+    let sin_2theta = 2.0 * (rnd.1 - rnd.1 * rnd.1).sqrt();
+    Vec3f {
+        x: 2.0 * phi.cos() * sin_2theta, y: 2.0 * phi.sin() * sin_2theta, z: cos_2theta
     }
 }

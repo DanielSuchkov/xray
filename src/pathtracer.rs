@@ -65,7 +65,8 @@ impl<S> Render<S> for CpuPathTracer<S> where S: Scene {
                 let hit_pos = ray.orig + ray.dir * isect.dist;
                 let brdf = match isect.surface {
                     SurfaceProperties::Material(mat_id) => {
-                        if let Some(brdf) = Brdf::new(&ray.dir, &isect.normal, self.scene.get_material(mat_id)) {
+                        let material = self.scene.get_material(mat_id);
+                        if let Some(brdf) = Brdf::new(&ray.dir, &isect.normal, material) {
                             brdf
                         } else {
                             break 'current_path;
@@ -80,7 +81,7 @@ impl<S> Render<S> for CpuPathTracer<S> where S: Scene {
                     }
                 };
 
-                if path_length > MAX_PATH_LENGTH || path_weight.sqnorm() < 1e-6 {
+                if path_length > MAX_PATH_LENGTH || path_weight.sqnorm() < self.rng.next_f32() {
                     break 'current_path;
                 }
 
