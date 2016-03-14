@@ -99,7 +99,8 @@ impl<S> Render<S> for CpuPathTracer<S> where S: Scene {
                     }
                 }
 
-                if let Some(sample) = brdf.sample((self.rng.next_f32(), self.rng.next_f32())) {
+                let rands = (self.rng.next_f32(), self.rng.next_f32(), self.rng.next_f32());
+                if let Some(sample) = brdf.sample(rands) {
                     path_weight = path_weight * sample.radiance_factor;
                     ray.dir = sample.in_dir_world;
                     ray.orig = hit_pos + ray.dir * EPS_RAY;

@@ -44,3 +44,12 @@ pub fn uniform_cone_sample(cos_a_max: f32, rnd: (f32, f32)) -> Vec3f {
         x: phi.cos() * sin_a, y: phi.sin() * sin_a, z: cos_a
     }
 }
+
+pub fn pow_cos_hemisphere_sample_w(n: f32, rnd: (f32, f32)) -> Vec3f {
+    let phi = rnd.0 * 2.0 * PI;
+    let cos_theta = rnd.1.powf(1.0 / (n + 1.0));
+    let sin_theta = (1.0 - cos_theta * cos_theta).sqrt();
+    Vec3f {
+        x: phi.cos() * sin_theta, y: phi.sin() * sin_theta, z: cos_theta
+    }
+}

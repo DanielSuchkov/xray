@@ -1,7 +1,7 @@
 #![allow(dead_code)]
 use math::{Vec3f, Vec2f, Zero, EPS_COSINE, EPS_PHONG};
 use math::vector_traits::*;
-use utility::{cos_hemisphere_sample_w, luminance};
+use utility::{cos_hemisphere_sample_w, luminance, pow_cos_hemisphere_sample_w};
 use std::f32::consts::{FRAC_1_PI, PI};
 use geometry::{Frame, Ray};
 use std::ops::Add;
@@ -18,6 +18,7 @@ pub struct Brdf {
     material: Material,
     own_basis: Frame,
     out_dir_local: Vec3f, // "out" in physical meaning, in fact - incoming
+    probs: Probabilities
 }
 
 pub struct BrdfSample {
@@ -48,17 +49,31 @@ impl Brdf {
                 material: *material,
                 own_basis: own_basis,
                 out_dir_local: out_dir_local,
+                probs: Probabilities::new(material)
             })
         }
     }
 
-    pub fn sample(&self, rnd: (f32, f32)) -> Option<BrdfSample> {
-        self.lambert_sample(rnd)
+    pub fn sample(&self, rnd: (f32, f32, f32)) -> Option<BrdfSample> {
+        let sample_rnds = (rnd.1, rnd.2);
+        if rnd.0 <= self.probs.diffuse {
+            self.lambert_sample(sample_rnds)
+        } else {
+            self.phong_sample(sample_rnds)
+        }
     }
 
     pub fn eval(&self, in_dir_world: &Vec3f) -> Option<BrdfEval> {
-        let in_dir_local = self.own_basis.to_local(in_dir_world);
-        self.lambert_eval(&in_dir_local)
+        let in_dir_local = self.own_basis.to_local(in_dir_world).normalize();
+        if in_dir_local.z < EPS_COSINE {
+            None
+        } else {
+            let lambert = self.lambert_eval(&in_dir_local);
+            let phong = self.phong_eval(&in_dir_local);
+            Some(BrdfEval {
+                radiance: lambert.radiance * self.probs.diffuse + phong.radiance * self.probs.phong
+            })
+        }
     }
 
     fn lambert_sample(&self, rnd: (f32, f32)) -> Option<BrdfSample> {
@@ -76,13 +91,37 @@ impl Brdf {
         }
     }
 
-    fn lambert_eval(&self, in_dir_local: &Vec3f) -> Option<BrdfEval> {
+    fn phong_sample(&self, rnd: (f32, f32)) -> Option<BrdfSample> {
+        // get dir around refl. dir, move it to normals basis and then move it to world coords
+        let in_dir_local_reflect = pow_cos_hemisphere_sample_w(self.material.phong_exp, rnd);
+        let reflect_dir = self.out_dir_local.reflect_local();
+        let reflect_basis = Frame::from_z(&reflect_dir);
+        let in_dir_local = reflect_basis.to_world(&in_dir_local_reflect);
+        let in_dir_world = self.own_basis.to_world(&in_dir_local);
         if in_dir_local.z < EPS_COSINE {
             None
         } else {
-            Some(BrdfEval {
-                radiance: self.material.diffuse * in_dir_local.z * FRAC_1_PI
+            Some(BrdfSample {
+                in_dir_world: in_dir_world,
+                cos_theta_in: in_dir_local.z,
+                radiance_factor: self.material.specular
             })
+        }
+    }
+
+    fn lambert_eval(&self, in_dir_local: &Vec3f) -> BrdfEval {
+        BrdfEval {
+            radiance: self.material.diffuse * in_dir_local.z.max(0.0) * FRAC_1_PI
+        }
+    }
+
+    fn phong_eval(&self, in_dir_local: &Vec3f) -> BrdfEval {
+        let refl_local = self.out_dir_local.reflect_local();
+        let dot_refl_wi = refl_local.dot(&in_dir_local).max(0.0).min(1.0);
+        // let dot_refl_wi = if dot_refl_wi < EPS_PHONG { 0.0 } else { dot_refl_wi };
+        let refl_brightness = dot_refl_wi.powf(self.material.phong_exp) * (self.material.phong_exp + 1.0) * 0.5;
+        BrdfEval {
+            radiance: self.material.specular * refl_brightness * FRAC_1_PI
         }
     }
 }
@@ -105,7 +144,7 @@ impl Material {
     }
 
     fn total_albedo(&self) -> f32 {
-        (self.albedo_specular() + self.albedo_diffuse()).min(1.0)
+        self.albedo_specular() + self.albedo_diffuse()
     }
 }
 

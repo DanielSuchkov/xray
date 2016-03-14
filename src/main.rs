@@ -99,6 +99,18 @@ fn main() {
         phong_exp: 1000.0
     };
 
+    let golden_spec = Material {
+        diffuse: Vec3f::new(0.0, 0.0, 0.0),
+        specular: Vec3f::new(1.0, 0.7, 0.3),
+        phong_exp: 10.0
+    };
+
+    let white_ceramics = Material {
+        diffuse: vec3_from_value(0.99),
+        specular: vec3_from_value(0.5),
+        phong_exp: 1000.0
+    };
+
     let cb = [
         Vec3f::new(-2.5,  2.5, -2.5), // 0
         Vec3f::new( 2.5,  2.5, -2.5), // 1
@@ -155,8 +167,8 @@ fn main() {
     }
 
     scene.add_object(Sphere { center: Vec3f::new(0.3, -1.1, 0.45), radius: 0.7 }, white_diffuse);
-    // scene.add_object(Sphere { center: Vec3f::new(-1.0, -1.7, 0.2), radius: 0.8 }, white_diffuse);
-    // scene.add_object(Sphere { center: Vec3f::new(1.2, -1.9, 0.0), radius: 0.6 }, sky_blue_diffuse);
+    scene.add_object(Sphere { center: Vec3f::new(-1.0, -1.7, 0.2), radius: 0.8 }, white_ceramics);
+    scene.add_object(Sphere { center: Vec3f::new(1.2, -1.9, 0.0), radius: 0.6 }, sky_blue_diffuse);
 
     let mut ren = CpuPathTracer::new(cam, scene);
     let mut iter_nb = 0;
