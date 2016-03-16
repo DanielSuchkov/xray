@@ -37,9 +37,9 @@ pub fn uniform_sphere_sample(rnd: (f32, f32)) -> Vec3f {
 }
 
 pub fn uniform_cone_sample(cos_a_max: f32, rnd: (f32, f32)) -> Vec3f {
+    let phi = 2.0 * PI * rnd.1;
     let cos_a = 1.0 - rnd.0 * (1.0 - cos_a_max);
     let sin_a = (1.0 - cos_a * cos_a).sqrt();
-    let phi = 2.0 * PI * rnd.1;
     Vec3f {
         x: phi.cos() * sin_a, y: phi.sin() * sin_a, z: cos_a
     }

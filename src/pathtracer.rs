@@ -4,7 +4,7 @@ use camera::PerspectiveCamera;
 use framebuffer::FrameBuffer;
 use geometry::{Frame, Ray};
 use math::vector_traits::*;
-use math::{Vec2u, Vec3f, Vec2f, Zero, One, EPS_RAY, EPS_COSINE, vec3_from_value};
+use math::{Vec2u, Vec3f, Vec2f, Zero, One, EPS_RAY, vec3_from_value};
 use rand::{StdRng, Rng, SeedableRng};
 use render::Render;
 use scene::{Scene, SurfaceProperties};
@@ -41,7 +41,7 @@ impl<S> Render<S> for CpuPathTracer<S> where S: Scene {
     fn iterate(&mut self, iter_nb: usize) {
         let res = self.camera.get_view_size();
         let lights_nb = self.scene.get_lights_nb();
-        // self.rng.reseed(&[iter_nb]); // i don't know is it necessary or not
+        // self.rng.reseed(&[iter_nb]);
         let (res_x, res_y) = (res.x as usize, res.y as usize);
         for pix_nb in 0..(res_x * res_y) {
             let (x, y) = (pix_nb % res_x, pix_nb / res_x);
@@ -59,11 +59,14 @@ impl<S> Render<S> for CpuPathTracer<S> where S: Scene {
                 let isect = if let Some(isect) = self.scene.nearest_intersection(&ray) {
                     isect
                 } else {
-                    if let Some(back_rad) = self.scene.get_background_light().radiate(&ray) {
-                        if path_length == 0 {
-                            color = back_rad.radiance;
-                        }
-                    }
+                    let backlight = self.scene.get_background_light();
+                    backlight.radiate(&ray).map(|rad| color = path_weight * rad.radiance);
+                    // // for next event estimation
+                    // if let Some(back_rad) = self.scene.get_background_light().radiate(&ray) {
+                    //    if path_length == 0 {
+                    //        color = back_rad.radiance;
+                    //    }
+                    // }
                     break 'current_path;
                 };
                 let hit_pos = ray.orig + ray.dir * isect.dist;
@@ -77,30 +80,36 @@ impl<S> Render<S> for CpuPathTracer<S> where S: Scene {
                         }
                     },
                     SurfaceProperties::Light(light_id) => {
-                        if path_length == 0 {
-                            if let Some(rad) = self.scene.get_light(light_id).radiate(&ray) {
-                                color = rad.radiance;
-                            }
+                        let light = self.scene.get_light(light_id);
+                        if let Some(rad) = light.radiate(&ray) {
+                            color = path_weight * rad.radiance;
                         }
+                        // // for next event estimation
+                        // if path_length == 0 {
+                        //     if let Some(rad) = self.scene.get_light(light_id).radiate(&ray) {
+                        //         color = rad.radiance;
+                        //     }
+                        // }
                         break 'current_path;
                     }
                 };
 
-                for i in 0..lights_nb {
-                    let rand_light = self.scene.get_light(i as i32);
-                    let rands = (self.rng.next_f32(), self.rng.next_f32());
-                    if let Some(illum) = rand_light.illuminate(&hit_pos, rands) {
-                        if let Some(brdf_eval) = brdf.eval(&illum.l_dir) {
-                            let shadow_ray = Ray { orig: hit_pos, dir: illum.l_dir };
-                            if !self.scene.was_occluded(&shadow_ray, illum.l_dist) {
-                                color = color + illum.radiance * path_weight * brdf_eval.radiance;
-                            }
-                        }
-                    }
-                }
+                // // next event estimation
+                // for i in 0..lights_nb {
+                //     let rand_light = self.scene.get_light(i as i32);
+                //     let rands = (self.rng.next_f32(), self.rng.next_f32());
+                //     if let Some(illum) = rand_light.illuminate(&hit_pos, rands) {
+                //         if let Some(brdf_eval) = brdf.eval(&illum.l_dir) {
+                //             let shadow_ray = Ray { orig: hit_pos, dir: illum.l_dir };
+                //             if !self.scene.was_occluded(&shadow_ray, illum.l_dist) {
+                //                 color = color + illum.radiance * path_weight * brdf_eval.radiance;
+                //             }
+                //         }
+                //     }
+                // }
 
-                let rands = (self.rng.next_f32(), self.rng.next_f32(), self.rng.next_f32());
-                if let Some(sample) = brdf.sample(rands) {
+                let sample_rnds = (self.rng.next_f32(), self.rng.next_f32(), self.rng.next_f32());
+                if let Some(sample) = brdf.sample(sample_rnds) {
                     path_weight = path_weight * sample.radiance_factor;
                     ray.dir = sample.in_dir_world;
                     ray.orig = hit_pos + ray.dir * EPS_RAY;
@@ -108,13 +117,7 @@ impl<S> Render<S> for CpuPathTracer<S> where S: Scene {
                     break 'current_path;
                 }
 
-                if path_length > MAX_PATH_LENGTH {
-                    break 'current_path;
-                }
-
-                // use here only |path_weight|^2 while implementing new features, 'cause it's
-                // affects result. i need reproducible results (for comparation with reference)
-                if path_weight.sqnorm() < self.rng.next_f32() { // russian roulette
+                if path_length > MAX_PATH_LENGTH || path_weight.sqnorm() * 100.0 < self.rng.next_f32() {
                     break 'current_path;
                 }
 
