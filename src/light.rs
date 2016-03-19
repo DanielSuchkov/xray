@@ -29,7 +29,7 @@ pub struct Illumination {
 
 pub struct Radiation {
     pub radiance: Vec3f,
-    // pub dir_pdf_w: f32,
+    // pub dir_pdf_a: f32,
 }
 
 pub struct LuminousObject<L: Luminous + Geometry> {
@@ -66,9 +66,7 @@ impl Light for BackgroundLight {
 
 impl Light for PointLight {
     fn radiate(&self, _out_ray: &Ray) -> Option<Radiation> {
-        Some(Radiation {
-            radiance: self.intensity
-        })
+        panic!("Wat?!");
     }
 
     fn illuminate(&self, hit_pnt: &Vec3f, _rnd: (f32, f32)) -> Option<Illumination> {
