@@ -17,12 +17,12 @@ pub struct Material {
 pub struct Brdf {
     material: Material,
     own_basis: Frame,
-    out_dir_local: Vec3f, // "out" in physical meaning, in fact - incoming
+    wo_local: Vec3f, // "out" in physical meaning, in fact - incoming
     probs: Probabilities
 }
 
 pub struct BrdfSample {
-    pub in_dir_world: Vec3f, // "in" in physical meaning, i.e. from light to eye
+    pub wi: Vec3f, // "in" in physical meaning, i.e. from light to eye
     pub cos_theta_in: f32,
     pub radiance_factor: Vec3f,
 }
@@ -41,14 +41,14 @@ struct Probabilities {
 impl Brdf {
     pub fn new(out_dir_world: &Vec3f, hit_normal: &Vec3f, material: &Material) -> Option<Brdf> {
         let own_basis = Frame::from_z(hit_normal);
-        let out_dir_local = own_basis.to_local(&-*out_dir_world);
-        if out_dir_local.z < EPS_COSINE {
+        let wo_local = own_basis.to_local(&-*out_dir_world);
+        if wo_local.z < EPS_COSINE {
             None
         } else {
             Some(Brdf {
                 material: *material,
                 own_basis: own_basis,
-                out_dir_local: out_dir_local,
+                wo_local: wo_local,
                 probs: Probabilities::new(material)
             })
         }
@@ -63,13 +63,13 @@ impl Brdf {
         }
     }
 
-    pub fn eval(&self, in_dir_world: &Vec3f) -> Option<BrdfEval> {
-        let in_dir_local = self.own_basis.to_local(in_dir_world).normalize();
-        if in_dir_local.z < EPS_COSINE {
+    pub fn eval(&self, wi: &Vec3f) -> Option<BrdfEval> {
+        let wi_local = self.own_basis.to_local(wi).normalize();
+        if wi_local.z < EPS_COSINE {
             None
         } else {
-            let lambert = self.lambert_eval(&in_dir_local);
-            let phong = self.phong_eval(&in_dir_local);
+            let lambert = self.lambert_eval(&wi_local);
+            let phong = self.phong_eval(&wi_local);
             Some(BrdfEval {
                 radiance: lambert.radiance * self.probs.diffuse + phong.radiance * self.probs.phong
             })
@@ -77,14 +77,14 @@ impl Brdf {
     }
 
     fn lambert_sample(&self, rnd: (f32, f32)) -> Option<BrdfSample> {
-        let in_dir_local = cos_hemisphere_sample_w(rnd);
-        let cos_theta_in = in_dir_local.z;
+        let wi_local = cos_hemisphere_sample_w(rnd);
+        let cos_theta_in = wi_local.z;
         if cos_theta_in < EPS_COSINE {
             None
         } else {
-            let in_dir_world = self.own_basis.to_world(&in_dir_local);
+            let wi = self.own_basis.to_world(&wi_local);
             Some(BrdfSample {
-                in_dir_world: in_dir_world,
+                wi: wi,
                 cos_theta_in: cos_theta_in,
                 radiance_factor: self.material.diffuse
             })
@@ -93,31 +93,31 @@ impl Brdf {
 
     fn phong_sample(&self, rnd: (f32, f32)) -> Option<BrdfSample> {
         // get dir around refl. dir, move it to normals basis and then move it to world coords
-        let in_dir_local_reflect = pow_cos_hemisphere_sample_w(self.material.phong_exp, rnd);
-        let reflect_dir = self.out_dir_local.reflect_local();
+        let wi_local_reflect = pow_cos_hemisphere_sample_w(self.material.phong_exp, rnd);
+        let reflect_dir = self.wo_local.reflect_local();
         let reflect_basis = Frame::from_z(&reflect_dir);
-        let in_dir_local = reflect_basis.to_world(&in_dir_local_reflect);
-        let in_dir_world = self.own_basis.to_world(&in_dir_local);
-        if in_dir_local.z < EPS_COSINE {
+        let wi_local = reflect_basis.to_world(&wi_local_reflect);
+        let wi = self.own_basis.to_world(&wi_local);
+        if wi_local.z < EPS_COSINE {
             None
         } else {
             Some(BrdfSample {
-                in_dir_world: in_dir_world,
-                cos_theta_in: in_dir_local.z,
+                wi: wi,
+                cos_theta_in: wi_local.z,
                 radiance_factor: self.material.specular
             })
         }
     }
 
-    fn lambert_eval(&self, in_dir_local: &Vec3f) -> BrdfEval {
+    fn lambert_eval(&self, wi_local: &Vec3f) -> BrdfEval {
         BrdfEval {
-            radiance: self.material.diffuse * in_dir_local.z.max(0.0) * FRAC_1_PI
+            radiance: self.material.diffuse * wi_local.z.max(0.0) * FRAC_1_PI
         }
     }
 
-    fn phong_eval(&self, in_dir_local: &Vec3f) -> BrdfEval {
-        let refl_local = self.out_dir_local.reflect_local();
-        let dot_refl_wi = refl_local.dot(&in_dir_local).max(0.0).min(1.0);
+    fn phong_eval(&self, wi_local: &Vec3f) -> BrdfEval {
+        let refl_local = self.wo_local.reflect_local();
+        let dot_refl_wi = refl_local.dot(&wi_local).max(0.0).min(1.0);
         // let dot_refl_wi = if dot_refl_wi < EPS_PHONG { 0.0 } else { dot_refl_wi };
         let refl_brightness = dot_refl_wi.powf(self.material.phong_exp) * (self.material.phong_exp + 1.0) * 0.5;
         BrdfEval {

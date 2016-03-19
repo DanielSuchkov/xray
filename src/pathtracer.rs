@@ -27,15 +27,14 @@ fn power_heuristic(current_pdf_w: f32, other_pdf_w: f32) -> f32 {
 const MAX_PATH_LENGTH: u32 = 100;
 
 impl<S> CpuPathTracer<S> where S: Scene {
-    fn uniform_sample_one_light(&mut self, p: &Vec3f/*, n: &Vec3f*/ /*, wo: &Vec3f*/, brdf: &Brdf) -> Vec3f {
-        let lights_nb = self.scene.get_lights_nb() as u32;
+    fn uniform_sample_one_light(&mut self, p: &Vec3f, brdf: &Brdf) -> Vec3f {
         let mut ld = Vec3f::zero();
 
         // brdf sampling
         let sample_rnds = (self.rng.next_f32(), self.rng.next_f32(), self.rng.next_f32());
         if let Some(sample) = brdf.sample(sample_rnds) {
             // sample.radiance_factor;
-            let brdf_ray = Ray { dir: sample.in_dir_world, orig: *p + sample.in_dir_world * EPS_RAY };
+            let brdf_ray = Ray { dir: sample.wi, orig: *p + sample.wi * EPS_RAY };
             if let Some(isect) = self.scene.nearest_intersection(&brdf_ray) {
                 if let SurfaceProperties::Light(light_id) = isect.surface {
                     let light = self.scene.get_light(light_id);
@@ -50,6 +49,7 @@ impl<S> CpuPathTracer<S> where S: Scene {
         }
 
         // // light sampling
+        // let lights_nb = self.scene.get_lights_nb() as u32;
         // let rand_light = self.scene.get_light((self.rng.next_u32() % lights_nb) as i32);
         // let rands = (self.rng.next_f32(), self.rng.next_f32());
         // if let Some(illum) = rand_light.illuminate(p, rands) {
@@ -97,9 +97,6 @@ impl<S> Render<S> for CpuPathTracer<S> where S: Scene {
                 let isect = if let Some(isect) = self.scene.nearest_intersection(&ray) {
                     isect
                 } else {
-                    // let backlight = self.scene.get_background_light();
-                    // backlight.radiate(&ray).map(|rad| color = path_weight * rad.radiance);
-                    // for next event estimation
                     if let Some(back_rad) = self.scene.get_background_light().radiate(&ray) {
                        if path_length == 0 {
                            color = back_rad.radiance;
@@ -107,7 +104,7 @@ impl<S> Render<S> for CpuPathTracer<S> where S: Scene {
                     }
                     break 'current_path;
                 };
-                let hit_pos = ray.orig + ray.dir * isect.dist;
+                let hit_point = ray.orig + ray.dir * isect.dist;
                 let brdf = match isect.surface {
                     SurfaceProperties::Material(mat_id) => {
                         let material = self.scene.get_material(mat_id);
@@ -118,11 +115,6 @@ impl<S> Render<S> for CpuPathTracer<S> where S: Scene {
                         }
                     },
                     SurfaceProperties::Light(light_id) => {
-                        // let light = self.scene.get_light(light_id);
-                        // if let Some(rad) = light.radiate(&ray) {
-                        //     color = path_weight * rad.radiance;
-                        // }
-                        // for next event estimation
                         if path_length == 0 {
                             if let Some(rad) = self.scene.get_light(light_id).radiate(&ray) {
                                 color = rad.radiance;
@@ -132,27 +124,13 @@ impl<S> Render<S> for CpuPathTracer<S> where S: Scene {
                     }
                 };
 
-                color = color + self.uniform_sample_one_light(&hit_pos, &brdf) * path_weight;
-
-                // // next event estimation
-                // for i in 0..lights_nb {
-                //     let rand_light = self.scene.get_light(i as i32);
-                //     let rands = (self.rng.next_f32(), self.rng.next_f32());
-                //     if let Some(illum) = rand_light.illuminate(&hit_pos, rands) {
-                //         if let Some(brdf_eval) = brdf.eval(&illum.l_dir) {
-                //             let shadow_ray = Ray { orig: hit_pos, dir: illum.l_dir };
-                //             if !self.scene.was_occluded(&shadow_ray, illum.l_dist) {
-                //                 color = color + illum.radiance * path_weight * brdf_eval.radiance;
-                //             }
-                //         }
-                //     }
-                // }
+                color = color + self.uniform_sample_one_light(&hit_point, &brdf) * path_weight;
 
                 let sample_rnds = (self.rng.next_f32(), self.rng.next_f32(), self.rng.next_f32());
                 if let Some(sample) = brdf.sample(sample_rnds) {
                     path_weight = path_weight * sample.radiance_factor;
-                    ray.dir = sample.in_dir_world;
-                    ray.orig = hit_pos + ray.dir * EPS_RAY;
+                    ray.dir = sample.wi;
+                    ray.orig = hit_point + ray.dir * EPS_RAY;
                 } else {
                     break 'current_path;
                 }
