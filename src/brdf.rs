@@ -24,11 +24,13 @@ pub struct Brdf {
 pub struct BrdfSample {
     pub wi: Vec3f, // "in" in physical meaning, i.e. from light to eye
     pub cos_theta_in: f32,
-    pub radiance_factor: Vec3f,
+    pub radiance: Vec3f,
+    pub pdf: f32,
 }
 
 pub struct BrdfEval {
     pub radiance: Vec3f,
+    pub pdf: f32,
 }
 
 #[derive(Debug, Clone)]
@@ -71,13 +73,14 @@ impl Brdf {
             let lambert = self.lambert_eval(&wi_local);
             let phong = self.phong_eval(&wi_local);
             Some(BrdfEval {
-                radiance: lambert.radiance * self.probs.diffuse + phong.radiance * self.probs.phong
+                radiance: lambert.radiance * self.probs.diffuse + phong.radiance * self.probs.phong,
+                pdf: lambert.pdf * self.probs.diffuse + phong.pdf * self.probs.phong
             })
         }
     }
 
     fn lambert_sample(&self, rnd: (f32, f32)) -> Option<BrdfSample> {
-        let wi_local = cos_hemisphere_sample_w(rnd);
+        let (wi_local, pdf) = cos_hemisphere_sample_w(rnd);
         let cos_theta_in = wi_local.z;
         if cos_theta_in < EPS_COSINE {
             None
@@ -86,42 +89,49 @@ impl Brdf {
             Some(BrdfSample {
                 wi: wi,
                 cos_theta_in: cos_theta_in,
-                radiance_factor: self.material.diffuse
+                radiance: self.material.diffuse,
+                pdf: pdf
             })
         }
     }
 
     fn phong_sample(&self, rnd: (f32, f32)) -> Option<BrdfSample> {
         // get dir around refl. dir, move it to normals basis and then move it to world coords
-        let wi_local_reflect = pow_cos_hemisphere_sample_w(self.material.phong_exp, rnd);
+        let (wi_local_reflect, pdf) = pow_cos_hemisphere_sample_w(self.material.phong_exp, rnd);
         let reflect_dir = self.wo_local.reflect_local();
         let reflect_basis = Frame::from_z(&reflect_dir);
         let wi_local = reflect_basis.to_world(&wi_local_reflect);
         let wi = self.own_basis.to_world(&wi_local);
+        let cos_theta = wi_local.z;
         if wi_local.z < EPS_COSINE {
             None
         } else {
             Some(BrdfSample {
                 wi: wi,
-                cos_theta_in: wi_local.z,
-                radiance_factor: self.material.specular
+                cos_theta_in: cos_theta,
+                radiance: self.material.specular,
+                pdf: pdf
             })
         }
     }
 
     fn lambert_eval(&self, wi_local: &Vec3f) -> BrdfEval {
+        let cos_theta = wi_local.z.max(0.0);
         BrdfEval {
-            radiance: self.material.diffuse * wi_local.z.max(0.0) * FRAC_1_PI
+            radiance: self.material.diffuse * cos_theta * FRAC_1_PI,
+            pdf: cos_theta * FRAC_1_PI,
         }
     }
 
     fn phong_eval(&self, wi_local: &Vec3f) -> BrdfEval {
         let refl_local = self.wo_local.reflect_local();
-        let dot_refl_wi = refl_local.dot(&wi_local).max(0.0).min(1.0);
-        // let dot_refl_wi = if dot_refl_wi < EPS_PHONG { 0.0 } else { dot_refl_wi };
-        let refl_brightness = dot_refl_wi.powf(self.material.phong_exp) * (self.material.phong_exp + 1.0) * 0.5;
+        let cos_theta = refl_local.dot(&wi_local).max(0.0).min(1.0);
+        // let cos_theta = if cos_theta < EPS_PHONG { 0.0 } else { cos_theta };
+        let n = self.material.phong_exp;
+        let refl_brightness = cos_theta.powf(n) * (n + 1.0) * 0.5 * FRAC_1_PI;
         BrdfEval {
-            radiance: self.material.specular * refl_brightness * FRAC_1_PI
+            radiance: self.material.specular * refl_brightness,
+            pdf: refl_brightness
         }
     }
 }

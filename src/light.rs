@@ -24,12 +24,12 @@ pub struct Illumination {
     pub radiance: Vec3f,
     pub l_dir: Vec3f,
     pub l_dist: f32,
-    // pub dir_pdf_w: f32,
+    pub pdf: f32,
 }
 
 pub struct Radiation {
     pub radiance: Vec3f,
-    // pub dir_pdf_a: f32,
+    pub pdf: f32,
 }
 
 pub struct LuminousObject<L: Luminous + Geometry> {
@@ -44,22 +44,26 @@ pub trait Light {
 }
 
 pub trait Luminous {
-    fn select_dir(&self, hit_pnt: &Vec3f, rnd: (f32, f32)) -> (Vec3f, f32); // dir from hit_pnt and weight
+    // dir from hit_pnt, weight and pdf
+    fn select_dir(&self, hit_pnt: &Vec3f, rnd: (f32, f32)) -> (Vec3f, f32, f32);
+    fn dir_pdf(&self, ray: &Ray) -> f32;
 }
 
 impl Light for BackgroundLight {
     fn radiate(&self, _out_ray: &Ray) -> Option<Radiation> {
         Some(Radiation {
-            radiance: self.intensity * self.scale
+            radiance: self.intensity * self.scale,
+            pdf: 0.25 * FRAC_1_PI,
         })
     }
 
     fn illuminate(&self, _hit_pnt: &Vec3f, rnd: (f32, f32)) -> Option<Illumination> {
-        let dir = uniform_sphere_sample(rnd);
+        let (dir, pdf) = uniform_sphere_sample_w(rnd);
         Some(Illumination {
             radiance: self.intensity * self.scale,
             l_dir: dir,
-            l_dist: 1e38
+            l_dist: 1e38,
+            pdf: pdf
         })
     }
 }
@@ -77,39 +81,52 @@ impl Light for PointLight {
             radiance: self.intensity / dist_sq * FRAC_1_PI, //< am i need for it (../(r^2*pi)) or not?
             l_dir: vec_to_light / l_dist,
             l_dist: l_dist,
+            pdf: 1.0,
         })
     }
 }
 
 impl Luminous for Sphere {
-    fn select_dir(&self, hit_pnt: &Vec3f, rnd: (f32, f32)) -> (Vec3f, f32) { // dir and weight
+    fn select_dir(&self, hit_pnt: &Vec3f, rnd: (f32, f32)) -> (Vec3f, f32, f32) { // dir, weight and pdf
         let w = self.center - *hit_pnt;
         let w2 = w.sqnorm();
-        let cos_alpha_max = (1.0 - (self.r2() / w2).min(1.0)).sqrt();
-        let frac = 1.0 - cos_alpha_max;
+        let cos_theta_max = (1.0 - (self.r2() / w2).min(1.0)).sqrt();
+        let frac = 1.0 - cos_theta_max;
         let omega = 2.0 * PI * frac;
         let w_basis = Frame::from_z(&w);
-        let ld_local = uniform_cone_sample(cos_alpha_max, rnd);
+        let ld_local = uniform_cone_sample(cos_theta_max, rnd);
         let ld = w_basis.to_world(&ld_local).normalize();
+        let area = 4.0 * PI * self.r2();
+        let pdf = w2 / (ld_local.z * area);
         assert!(omega >= 0.0);
-        (ld, omega)
+        (ld, omega, pdf)
+    }
+
+    fn dir_pdf(&self, ray: &Ray) -> f32 {
+        let w = self.center - ray.orig;
+        let w2 = w.sqnorm();
+        let cos_theta = w.dot(&ray.dir).max(0.0);
+        let area = 4.0 * PI * self.r2();
+        w2 / (cos_theta * area)
     }
 }
 
 impl<L> Light for LuminousObject<L> where L: Luminous + Geometry {
-    fn radiate(&self, _out_ray: &Ray) -> Option<Radiation> {
+    fn radiate(&self, out_ray: &Ray) -> Option<Radiation> {
         Some(Radiation {
-            radiance: self.intensity
+            radiance: self.intensity,
+            pdf: self.object.dir_pdf(out_ray),
         })
     }
 
     fn illuminate(&self, hit_pnt: &Vec3f, rnd: (f32, f32)) -> Option<Illumination> {
-        let (ld, omega) = self.object.select_dir(hit_pnt, rnd);
+        let (ld, omega, pdf) = self.object.select_dir(hit_pnt, rnd);
         if let Some(isect) = self.object.intersect(&Ray { orig: *hit_pnt, dir: ld }) {
             Some(Illumination {
                 radiance: self.intensity * omega,
                 l_dir: ld,
-                l_dist: isect.dist
+                l_dist: isect.dist,
+                pdf: pdf
             })
         } else {
             None

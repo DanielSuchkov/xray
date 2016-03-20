@@ -17,11 +17,23 @@ pub struct CpuPathTracer<S: Scene> {
     rng: StdRng,
 }
 
-// Power heuristic
 fn power_heuristic(current_pdf_w: f32, other_pdf_w: f32) -> f32 {
     let current_pdf_2 = current_pdf_w * current_pdf_w;
     let other_pdf_2 = other_pdf_w * other_pdf_w;
     (current_pdf_2) / (current_pdf_2 + other_pdf_2)
+}
+
+fn max_heuristic(current_pdf_w: f32, other_pdf_w: f32) -> f32 {
+    if current_pdf_w >= other_pdf_w {
+        1.0
+    } else {
+        0.0
+    }
+}
+
+fn mis2(current_pdf_w: f32, other_pdf_w: f32) -> f32 {
+    // max_heuristic(current_pdf_w, other_pdf_w)
+    power_heuristic(current_pdf_w, other_pdf_w)
 }
 
 const MAX_PATH_LENGTH: u32 = 100;
@@ -30,35 +42,52 @@ impl<S> CpuPathTracer<S> where S: Scene {
     fn uniform_sample_one_light(&mut self, p: &Vec3f, brdf: &Brdf) -> Vec3f {
         let mut ld = Vec3f::zero();
 
+        // light sampling
+        let lights_nb = self.scene.get_lights_nb() as u32;
+        let light_nb = (self.rng.next_u32() % lights_nb) as i32;
+        let light_pick_prob = 1.0 / lights_nb as f32;
+        // let mut res_weight = 0.0;
+        let rand_light = self.scene.get_light(light_nb);
+        let rands = (self.rng.next_f32(), self.rng.next_f32());
+        if let Some(illum) = rand_light.illuminate(p, rands) {
+            if let Some(brdf_eval) = brdf.eval(&illum.l_dir) {
+                let shadow_ray = Ray { orig: *p, dir: illum.l_dir };
+                if !self.scene.was_occluded(&shadow_ray, illum.l_dist) {
+                    let weight = mis2(illum.pdf * light_pick_prob, brdf_eval.pdf);
+                    // res_weight += weight;
+                    // ld = ld + Vec3f::new(1.0, 0.0, 0.0) * max_heuristic(illum.pdf, brdf_eval.pdf);
+                    ld = ld + illum.radiance * brdf_eval.radiance * weight * lights_nb as f32;
+                }
+            }
+        }
+
         // brdf sampling
         let sample_rnds = (self.rng.next_f32(), self.rng.next_f32(), self.rng.next_f32());
         if let Some(sample) = brdf.sample(sample_rnds) {
-            // sample.radiance_factor;
             let brdf_ray = Ray { dir: sample.wi, orig: *p + sample.wi * EPS_RAY };
             if let Some(isect) = self.scene.nearest_intersection(&brdf_ray) {
-                if let SurfaceProperties::Light(light_id) = isect.surface {
-                    let light = self.scene.get_light(light_id);
-                    if let Some(rad) = light.radiate(&brdf_ray) {
-                        ld = ld + sample.radiance_factor * rad.radiance;
-                    }
+                match isect.surface {
+                    SurfaceProperties::Light(light_id) if light_nb == light_id => {
+                        if let Some(rad) = self.scene.get_light(light_id).radiate(&brdf_ray) {
+                            let weight = mis2(sample.pdf, rad.pdf * light_pick_prob);
+                            // res_weight += weight;
+                            // ld = ld + Vec3f::new(0.0, 0.0, 1.0) * max_heuristic(sample.pdf, rad.pdf);
+                            ld = ld + sample.radiance * rad.radiance * weight;
+                        }
+                    },
+                    _ => {}
                 }
             } else {
-                let backlight = self.scene.get_background_light();
-                backlight.radiate(&brdf_ray).map(|rad| ld = ld + sample.radiance_factor * rad.radiance);
+                self.scene.get_background_light().radiate(&brdf_ray).map(|rad| {
+                    let weight = mis2(sample.pdf, rad.pdf * light_pick_prob);
+                    // res_weight += weight;
+                    // ld = ld + Vec3f::new(0.0, 0.0, 1.0) * max_heuristic(sample.pdf, rad.pdf);
+                    ld = ld + sample.radiance * rad.radiance * weight;
+                });
             };
         }
-
-        // // light sampling
-        // let lights_nb = self.scene.get_lights_nb() as u32;
-        // let rand_light = self.scene.get_light((self.rng.next_u32() % lights_nb) as i32);
-        // let rands = (self.rng.next_f32(), self.rng.next_f32());
-        // if let Some(illum) = rand_light.illuminate(p, rands) {
-        //     if let Some(brdf_eval) = brdf.eval(&illum.l_dir) {
-        //         let shadow_ray = Ray { orig: *p, dir: illum.l_dir };
-        //         if !self.scene.was_occluded(&shadow_ray, illum.l_dist) {
-        //             ld = ld + illum.radiance * brdf_eval.radiance * lights_nb as f32;
-        //         }
-        //     }
+        // if res_weight >= 1.0 {
+        //     println!("{:?}", res_weight);
         // }
         ld
     }
@@ -94,24 +123,23 @@ impl<S> Render<S> for CpuPathTracer<S> where S: Scene {
             let mut path_weight = Vec3f::one();
             let mut color = Vec3f::zero();
             'current_path: loop {
-                let isect = if let Some(isect) = self.scene.nearest_intersection(&ray) {
-                    isect
-                } else {
-                    if let Some(back_rad) = self.scene.get_background_light().radiate(&ray) {
-                       if path_length == 0 {
-                           color = back_rad.radiance;
-                       }
+                let isect = match self.scene.nearest_intersection(&ray) {
+                    Some(isect) => isect,
+                    None => {
+                        if path_length == 0 {
+                            if let Some(back_rad) = self.scene.get_background_light().radiate(&ray) {
+                               color = back_rad.radiance;
+                           }
+                        }
+                        break 'current_path;
                     }
-                    break 'current_path;
                 };
                 let hit_point = ray.orig + ray.dir * isect.dist;
                 let brdf = match isect.surface {
                     SurfaceProperties::Material(mat_id) => {
-                        let material = self.scene.get_material(mat_id);
-                        if let Some(brdf) = Brdf::new(&ray.dir, &isect.normal, material) {
-                            brdf
-                        } else {
-                            break 'current_path;
+                        match Brdf::new(&ray.dir, &isect.normal, self.scene.get_material(mat_id)) {
+                            Some(brdf) => brdf,
+                            None       => break 'current_path
                         }
                     },
                     SurfaceProperties::Light(light_id) => {
@@ -128,7 +156,7 @@ impl<S> Render<S> for CpuPathTracer<S> where S: Scene {
 
                 let sample_rnds = (self.rng.next_f32(), self.rng.next_f32(), self.rng.next_f32());
                 if let Some(sample) = brdf.sample(sample_rnds) {
-                    path_weight = path_weight * sample.radiance_factor;
+                    path_weight = path_weight * sample.radiance;
                     ray.dir = sample.wi;
                     ray.orig = hit_point + ray.dir * EPS_RAY;
                 } else {
