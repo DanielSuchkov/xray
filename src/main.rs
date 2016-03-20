@@ -106,8 +106,8 @@ fn main() {
     };
 
     let white_ceramics = Material {
-        diffuse: vec3_from_value(0.99),
-        specular: vec3_from_value(0.5),
+        diffuse: vec3_from_value(0.5),
+        specular: vec3_from_value(0.99),
         phong_exp: 1000.0
     };
 

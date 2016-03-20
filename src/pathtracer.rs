@@ -17,6 +17,10 @@ pub struct CpuPathTracer<S: Scene> {
     rng: StdRng,
 }
 
+fn balance_heuristic(current_pdf_w: f32, other_pdf_w: f32) -> f32 {
+    current_pdf_w / (current_pdf_w + other_pdf_w)
+}
+
 fn power_heuristic(current_pdf_w: f32, other_pdf_w: f32) -> f32 {
     let current_pdf_2 = current_pdf_w * current_pdf_w;
     let other_pdf_2 = other_pdf_w * other_pdf_w;
@@ -33,6 +37,7 @@ fn max_heuristic(current_pdf_w: f32, other_pdf_w: f32) -> f32 {
 
 fn mis2(current_pdf_w: f32, other_pdf_w: f32) -> f32 {
     // max_heuristic(current_pdf_w, other_pdf_w)
+    // balance_heuristic(current_pdf_w, other_pdf_w)
     power_heuristic(current_pdf_w, other_pdf_w)
 }
 
@@ -42,24 +47,10 @@ impl<S> CpuPathTracer<S> where S: Scene {
     fn uniform_sample_one_light(&mut self, p: &Vec3f, brdf: &Brdf) -> Vec3f {
         let mut ld = Vec3f::zero();
 
-        // light sampling
         let lights_nb = self.scene.get_lights_nb() as u32;
         let light_nb = (self.rng.next_u32() % lights_nb) as i32;
         let light_pick_prob = 1.0 / lights_nb as f32;
-        // let mut res_weight = 0.0;
         let rand_light = self.scene.get_light(light_nb);
-        let rands = (self.rng.next_f32(), self.rng.next_f32());
-        if let Some(illum) = rand_light.illuminate(p, rands) {
-            if let Some(brdf_eval) = brdf.eval(&illum.l_dir) {
-                let shadow_ray = Ray { orig: *p, dir: illum.l_dir };
-                if !self.scene.was_occluded(&shadow_ray, illum.l_dist) {
-                    let weight = mis2(illum.pdf * light_pick_prob, brdf_eval.pdf);
-                    // res_weight += weight;
-                    // ld = ld + Vec3f::new(1.0, 0.0, 0.0) * max_heuristic(illum.pdf, brdf_eval.pdf);
-                    ld = ld + illum.radiance * brdf_eval.radiance * weight * lights_nb as f32;
-                }
-            }
-        }
 
         // brdf sampling
         let sample_rnds = (self.rng.next_f32(), self.rng.next_f32(), self.rng.next_f32());
@@ -68,10 +59,8 @@ impl<S> CpuPathTracer<S> where S: Scene {
             if let Some(isect) = self.scene.nearest_intersection(&brdf_ray) {
                 match isect.surface {
                     SurfaceProperties::Light(light_id) if light_nb == light_id => {
-                        if let Some(rad) = self.scene.get_light(light_id).radiate(&brdf_ray) {
+                        if let Some(rad) = rand_light.radiate(&brdf_ray) {
                             let weight = mis2(sample.pdf, rad.pdf * light_pick_prob);
-                            // res_weight += weight;
-                            // ld = ld + Vec3f::new(0.0, 0.0, 1.0) * max_heuristic(sample.pdf, rad.pdf);
                             ld = ld + sample.radiance * rad.radiance * weight;
                         }
                     },
@@ -80,15 +69,22 @@ impl<S> CpuPathTracer<S> where S: Scene {
             } else {
                 self.scene.get_background_light().radiate(&brdf_ray).map(|rad| {
                     let weight = mis2(sample.pdf, rad.pdf * light_pick_prob);
-                    // res_weight += weight;
-                    // ld = ld + Vec3f::new(0.0, 0.0, 1.0) * max_heuristic(sample.pdf, rad.pdf);
                     ld = ld + sample.radiance * rad.radiance * weight;
                 });
             };
         }
-        // if res_weight >= 1.0 {
-        //     println!("{:?}", res_weight);
-        // }
+
+        // light sampling
+        let rands = (self.rng.next_f32(), self.rng.next_f32());
+        if let Some(illum) = rand_light.illuminate(p, rands) {
+            if let Some(brdf_eval) = brdf.eval(&illum.l_dir) {
+                let shadow_ray = Ray { orig: *p, dir: illum.l_dir };
+                if !self.scene.was_occluded(&shadow_ray, illum.l_dist) {
+                    let weight = mis2(illum.pdf * light_pick_prob, brdf_eval.pdf);
+                    ld = ld + illum.radiance * brdf_eval.radiance * weight * lights_nb as f32;
+                }
+            }
+        }
         ld
     }
 }
@@ -107,8 +103,6 @@ impl<S> Render<S> for CpuPathTracer<S> where S: Scene {
 
     fn iterate(&mut self, iter_nb: usize) {
         let res = self.camera.get_view_size();
-        // let lights_nb = self.scene.get_lights_nb();
-        // self.rng.reseed(&[iter_nb]);
         let (res_x, res_y) = (res.x as usize, res.y as usize);
         for pix_nb in 0..(res_x * res_y) {
             let (x, y) = (pix_nb % res_x, pix_nb / res_x);
@@ -163,7 +157,8 @@ impl<S> Render<S> for CpuPathTracer<S> where S: Scene {
                     break 'current_path;
                 }
 
-                if path_length > MAX_PATH_LENGTH || path_weight.sqnorm() * 100.0 < self.rng.next_f32() {
+                let russian_roulette = path_weight.sqnorm() * 100.0 < self.rng.next_f32();
+                if path_length > MAX_PATH_LENGTH || russian_roulette {
                     break 'current_path;
                 }
 

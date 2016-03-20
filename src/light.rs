@@ -96,18 +96,18 @@ impl Luminous for Sphere {
         let w_basis = Frame::from_z(&w);
         let ld_local = uniform_cone_sample(cos_theta_max, rnd);
         let ld = w_basis.to_world(&ld_local).normalize();
-        let area = 4.0 * PI * self.r2();
-        let pdf = w2 / (ld_local.z * area);
-        assert!(omega >= 0.0);
+        let pdf = FRAC_1_PI * 0.5 / (1.0 - cos_theta_max);
         (ld, omega, pdf)
     }
 
     fn dir_pdf(&self, ray: &Ray) -> f32 {
         let w = self.center - ray.orig;
         let w2 = w.sqnorm();
-        let cos_theta = w.dot(&ray.dir).max(0.0);
-        let area = 4.0 * PI * self.r2();
-        w2 / (cos_theta * area)
+        // let cos_theta = ray.dir.dot(&w).abs();
+        let cos_theta_max = (1.0 - (self.r2() / w2).min(1.0)).sqrt();
+        // let sin_theta_max2 = (self.r2() / w2).min(1.0).max(0.0);
+        FRAC_1_PI * 0.5 / (1.0 - cos_theta_max)
+        // cos_theta * FRAC_1_PI / sin_theta_max2
     }
 }
 

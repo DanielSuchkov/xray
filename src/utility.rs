@@ -7,14 +7,12 @@ pub fn luminance(a_rgb: &Vec3f) -> f32 {
     0.212671 * a_rgb.x + 0.715160 * a_rgb.y + 0.072169 * a_rgb.z
 }
 
-pub fn cos_hemisphere_sample_w(rnd: (f32, f32)) -> (Vec3f, f32) {
+pub fn cos_hemisphere_sample(rnd: (f32, f32)) -> Vec3f {
     let phi = rnd.0 * 2.0 * PI;
     let cos_theta = rnd.1.sqrt();
     let sin_theta = (1.0 - cos_theta * cos_theta).sqrt();
 
-    let wi = Vec3f::new(sin_theta * phi.cos(), sin_theta * phi.sin(), cos_theta);
-    let pdf = wi.z * FRAC_1_PI;
-    (wi, pdf)
+    Vec3f::new(sin_theta * phi.cos(), sin_theta * phi.sin(), cos_theta)
 }
 
 pub fn uniform_hemisphere_sample_w(rnd: (f32, f32)) -> (Vec3f, f32) {
@@ -47,10 +45,9 @@ pub fn uniform_cone_sample(cos_theta_max: f32, rnd: (f32, f32)) -> Vec3f {
     }
 }
 
-pub fn pow_cos_hemisphere_sample_w(n: f32, rnd: (f32, f32)) -> (Vec3f, f32) {
+pub fn pow_cos_hemisphere_sample(n: f32, rnd: (f32, f32)) -> Vec3f {
     let phi = rnd.0 * 2.0 * PI;
     let cos_theta = rnd.1.powf(1.0 / (n + 1.0));
     let sin_theta = (1.0 - cos_theta * cos_theta).sqrt();
-    let pdf = cos_theta.powf(n) * (n + 1.0) * 0.5 * FRAC_1_PI;
-    (Vec3f::new(phi.cos() * sin_theta, phi.sin() * sin_theta, cos_theta), pdf)
+    Vec3f::new(phi.cos() * sin_theta, phi.sin() * sin_theta, cos_theta)
 }
