@@ -122,10 +122,10 @@ impl Brdf {
 
     fn phong_eval(&self, wi_local: &Vec3f) -> BrdfEval {
         let refl_local = self.wo_local.reflect_local();
-        let refl_brightness = self.phong_pdf(wi_local, &refl_local);
+        let pdf = self.phong_pdf(wi_local, &refl_local);
         BrdfEval {
-            radiance: self.material.specular * refl_brightness,
-            pdf: refl_brightness
+            radiance: self.material.specular * pdf,
+            pdf: pdf
         }
     }
 

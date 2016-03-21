@@ -106,7 +106,7 @@ impl Luminous for Sphere {
         // let cos_theta = ray.dir.dot(&w).abs();
         let cos_theta_max = (1.0 - (self.r2() / w2).min(1.0)).sqrt();
         // let sin_theta_max2 = (self.r2() / w2).min(1.0).max(0.0);
-        FRAC_1_PI * 0.5 / (1.0 - cos_theta_max)
+        (FRAC_1_PI * 0.5 / (1.0 - cos_theta_max)).max(0.0)
         // cos_theta * FRAC_1_PI / sin_theta_max2
     }
 }

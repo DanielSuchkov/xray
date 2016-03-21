@@ -10,7 +10,7 @@ pub fn luminance(a_rgb: &Vec3f) -> f32 {
 pub fn cos_hemisphere_sample(rnd: (f32, f32)) -> Vec3f {
     let phi = rnd.0 * 2.0 * PI;
     let cos_theta = rnd.1.sqrt();
-    let sin_theta = (1.0 - cos_theta * cos_theta).sqrt();
+    let sin_theta = (1.0 - rnd.1).sqrt();
 
     Vec3f::new(sin_theta * phi.cos(), sin_theta * phi.sin(), cos_theta)
 }
