@@ -1,6 +1,6 @@
 #![allow(dead_code)]
 use math::vector_traits::*;
-use math::{Vec3f, ortho, vec3_from_value};
+use math::{Vec3f, ortho, vec3_from_value, EPS_RAY};
 use scene::SurfaceProperties;
 use std::f32;
 use std::rc::Rc;
@@ -60,18 +60,23 @@ pub struct Frame {
     oz: Vec3f,
 }
 
+pub struct DFSphere {
+    pub center: Vec3f,
+    pub radius: f32,
+}
+
 pub struct GeometryList {
     geometries: Vec<Box<GeometrySurface>>
 }
 
 pub trait Geometry {
     fn intersect(&self, ray: &Ray) -> Option<Intersection>;
-    fn build_aabbox(&self) -> AABBox;
+    // fn build_aabbox(&self) -> AABBox;
 }
 
 pub trait GeometrySurface {
     fn intersect(&self, ray: &Ray) -> Option<SurfaceIntersection>;
-    fn build_aabbox(&self) -> AABBox;
+    // fn build_aabbox(&self) -> AABBox;
 }
 
 pub trait GeometryManager {
@@ -79,7 +84,12 @@ pub trait GeometryManager {
     fn nearest_intersection(&self, ray: &Ray) -> Option<SurfaceIntersection>;
     fn was_occluded(&self, ray: &Ray, dist: f32) -> bool;
     fn add_geometry<G>(&mut self, object: G) where G: GeometrySurface + 'static;
-    fn build_aabbox(&self) -> AABBox;
+    // fn build_aabbox(&self) -> AABBox;
+}
+
+pub trait DistanceField {
+    fn dist(&self, point: &Vec3f) -> f32;
+    fn normal(&self, point: &Vec3f) -> f32;
 }
 
 impl<G> GeometrySurface for Surface<G> where G: Geometry {
@@ -91,8 +101,42 @@ impl<G> GeometrySurface for Surface<G> where G: Geometry {
         })
     }
 
-    fn build_aabbox(&self) -> AABBox {
-        self.geometry.build_aabbox()
+    // fn build_aabbox(&self) -> AABBox {
+    //     self.geometry.build_aabbox()
+    // }
+}
+
+impl DFSphere {
+    fn dist(&self, point: &Vec3f) -> f32 {
+        (*point - self.center).norm() - self.radius
+    }
+}
+
+impl Geometry for DFSphere {
+    // this is just as proof-of-concept.
+    // 1) it should be in separate trait for distance fields
+    // 2) d have to be devided by gradient value (see http://www.iquilezles.org/www/articles/distance/distance.htm)
+    // 3) cheat with normals: they are calculated analiticaly
+    //    but has to be calculated numericaly with differentials (for common case).
+    fn intersect(&self, ray: &Ray) -> Option<Intersection> {
+        let mut t = 0.0;
+        let mut dprev = 1e38;
+        for _ in 0..10000 {
+            let new_point = ray.orig + ray.dir * t;
+            let d = self.dist(&new_point);
+            if d < 1e-6 {
+                return Some(Intersection {
+                    dist: t,
+                    normal: (new_point - self.center).normalize()
+                })
+            }
+            if d > dprev {
+                return None;
+            }
+            dprev = d;
+            t += d;
+        }
+        None
     }
 }
 
@@ -167,12 +211,12 @@ impl Geometry for Sphere {
         })
     }
 
-    fn build_aabbox(&self) -> AABBox {
-        AABBox {
-            min: self.center - vec3_from_value(self.radius),
-            max: self.center + vec3_from_value(self.radius)
-        }
-    }
+    // fn build_aabbox(&self) -> AABBox {
+    //     AABBox {
+    //         min: self.center - vec3_from_value(self.radius),
+    //         max: self.center + vec3_from_value(self.radius)
+    //     }
+    // }
 }
 
 impl Triangle {
@@ -214,16 +258,16 @@ impl Geometry for Triangle {
         }
     }
 
-    fn build_aabbox(&self) -> AABBox {
-        let (mut min, mut max) = (self.vert[0], self.vert[1]);
-        for &v in self.vert.iter() {
-            for i in 0..3 {
-                min[i] = min[i].min(v[i]);
-                max[i] = max[i].max(v[i]);
-            }
-        }
-        AABBox { min: min, max: max }
-    }
+    // fn build_aabbox(&self) -> AABBox {
+    //     let (mut min, mut max) = (self.vert[0], self.vert[1]);
+    //     for &v in self.vert.iter() {
+    //         for i in 0..3 {
+    //             min[i] = min[i].min(v[i]);
+    //             max[i] = max[i].max(v[i]);
+    //         }
+    //     }
+    //     AABBox { min: min, max: max }
+    // }
 }
 
 impl GeometryManager for GeometryList {
@@ -255,13 +299,13 @@ impl GeometryManager for GeometryList {
         self.geometries.push(Box::new(object));
     }
 
-    fn build_aabbox(&self) -> AABBox {
-        let mut aabb = AABBox::new_infinity();
-        for geo in self.geometries.iter() {
-            aabb.grow_mut(&geo.build_aabbox());
-        }
-        aabb
-    }
+    // fn build_aabbox(&self) -> AABBox {
+    //     let mut aabb = AABBox::new_infinity();
+    //     for geo in self.geometries.iter() {
+    //         aabb.grow_mut(&geo.build_aabbox());
+    //     }
+    //     aabb
+    // }
 }
 
 impl Frame {

@@ -20,7 +20,7 @@ use sfml::window::{VideoMode, ContextSettings, event, window_style};
 
 use brdf::Material;
 use camera::{PerspectiveCamera, CameraBuilder, Camera};
-use geometry::{GeometryList, Sphere, Triangle};
+use geometry::{GeometryList, Sphere, Triangle, DFSphere};
 use math::{Vec3f, Vec2u, One, Zero, vec3_from_value};
 use render::Render;
 use light::{/*AreaLight, */PointLight, BackgroundLight};
@@ -166,7 +166,7 @@ fn main() {
         scene.add_object(Triangle::new(cb[6], cb[2], cb[1]), green_diffuse);
     }
 
-    scene.add_object(Sphere { center: Vec3f::new(0.3, -1.1, 0.45), radius: 0.7 }, white_diffuse);
+    scene.add_object(DFSphere { center: Vec3f::new(0.3, -1.1, 0.45), radius: 0.7 }, white_diffuse);
     scene.add_object(Sphere { center: Vec3f::new(-1.0, -1.7, 0.2), radius: 0.8 }, white_ceramics);
     scene.add_object(Sphere { center: Vec3f::new(1.2, -1.9, 0.0), radius: 0.6 }, sky_blue_diffuse);
 
