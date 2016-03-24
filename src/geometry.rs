@@ -6,7 +6,7 @@ use std::f32;
 use std::rc::Rc;
 
 const EPS_DIST_FIELD: f32 = 1e-6;
-const MAX_DFIELD_STEPS: usize = 64;
+const MAX_DFIELD_STEPS: usize = 256;
 
 #[derive(Debug, Clone, Copy)]
 pub struct SurfaceIntersection {
@@ -67,7 +67,8 @@ pub struct DFieldsSubstr<A, B>
     where A: DistanceField,
           B: DistanceField {
     pub a: A,
-    pub b: B
+    pub b: B,
+    pub pos: Vec3f,
 }
 
 pub struct DFieldsUnion<A, B>
@@ -75,6 +76,7 @@ pub struct DFieldsUnion<A, B>
           B: DistanceField {
     pub a: A,
     pub b: B,
+    pub pos: Vec3f,
 }
 
 pub trait Geometry {
@@ -133,14 +135,16 @@ impl DistanceField for Sphere {
 impl<A, B> DistanceField for DFieldsSubstr<A, B>
     where A: DistanceField, B: DistanceField {
     fn dist(&self, point: &Vec3f) -> f32 {
-        self.b.dist(point).max(-self.a.dist(point))
+        let point = *point - self.pos;
+        self.a.dist(&point).max(-self.b.dist(&point))
     }
 }
 
 impl<A, B> DistanceField for DFieldsUnion<A, B>
     where A: DistanceField, B: DistanceField {
     fn dist(&self, point: &Vec3f) -> f32 {
-        self.a.dist(point).min(self.b.dist(point))
+        let point = *point - self.pos;
+        self.a.dist(&point).min(self.b.dist(&point))
     }
 }
 
@@ -253,7 +257,7 @@ impl GeometryList {
 
             let mut d = max_dist;
             for ref df in self.dfields.iter() {
-                let grad = df.grad(&new_point, 1e-6);
+                let grad = df.grad(&new_point, 1e-3);
                 let dist = df.dist(&new_point) / grad.norm();
                 d = d.min(dist);
                 if dist < EPS_DIST_FIELD {
@@ -284,7 +288,7 @@ impl GeometryManager for GeometryList {
 
     fn nearest_intersection(&self, ray: &Ray) -> Option<SurfaceIntersection> {
         let isect = self.nearest_geo_isect(ray);
-        self.nearest_isosuface_isect(ray, isect.map_or(1e35, |isec| isec.dist)).or(isect)
+        self.nearest_isosuface_isect(ray, isect.map_or(10000.0, |isec| isec.dist)).or(isect)
     }
 
     fn was_occluded(&self, ray: &Ray, dist: f32) -> bool {
