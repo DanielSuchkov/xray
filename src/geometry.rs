@@ -1,9 +1,12 @@
 #![allow(dead_code)]
 use math::vector_traits::*;
-use math::{Vec3f, ortho, vec3_from_value, EPS_RAY};
+use math::{Vec3f, ortho, vec3_from_value, EPS_RAY, smin};
 use scene::SurfaceProperties;
 use std::f32;
 use std::rc::Rc;
+
+const EPS_DIST_FIELD: f32 = 1e-6;
+const MAX_DFIELD_STEPS: usize = 64;
 
 #[derive(Debug, Clone, Copy)]
 pub struct SurfaceIntersection {
@@ -12,27 +15,22 @@ pub struct SurfaceIntersection {
     pub surface: SurfaceProperties,
 }
 
+#[derive(Debug, Clone, Copy)]
 pub struct Intersection {
     pub normal: Vec3f, // normal at intersection point
     pub dist: f32, // distance to nearest intersection point
 }
 
-pub struct Surface<G: Geometry + 'static> {
+#[derive(Debug, Clone)]
+pub struct Surface<G: Geometry> {
     pub geometry: G,
     pub properties: SurfaceProperties,
 }
 
-#[derive(Debug, Clone, Copy)]
-pub struct AABBox {
-    pub min: Vec3f,
-    pub max: Vec3f,
-}
-
-#[derive(Debug, Clone, Copy)]
-pub struct BSphere {
-    pub center: Vec3f,
-    pub radius: f32,
-    pub inv_radius_sqr: f32, // 1.0/(r^2)
+#[derive(Debug, Clone)]
+pub struct DFieldIsosurface<D: DistanceField> {
+    pub dfield: D,
+    pub properties: SurfaceProperties
 }
 
 #[derive(Debug, Clone, Copy)]
@@ -60,23 +58,52 @@ pub struct Frame {
     oz: Vec3f,
 }
 
-pub struct DFSphere {
-    pub center: Vec3f,
-    pub radius: f32,
+pub struct GeometryList {
+    geometries: Vec<Box<GeometrySurface>>,
+    dfields: Vec<Box<Isosurface>>
 }
 
-pub struct GeometryList {
-    geometries: Vec<Box<GeometrySurface>>
+pub struct DFieldsSubstr<A, B>
+    where A: DistanceField,
+          B: DistanceField {
+    pub a: A,
+    pub b: B
+}
+
+pub struct DFieldsUnion<A, B>
+    where A: DistanceField,
+          B: DistanceField {
+    pub a: A,
+    pub b: B,
 }
 
 pub trait Geometry {
     fn intersect(&self, ray: &Ray) -> Option<Intersection>;
-    // fn build_aabbox(&self) -> AABBox;
 }
 
 pub trait GeometrySurface {
     fn intersect(&self, ray: &Ray) -> Option<SurfaceIntersection>;
-    // fn build_aabbox(&self) -> AABBox;
+}
+
+pub trait DistanceField {
+    fn dist(&self, point: &Vec3f) -> f32;
+
+    fn grad(&self, p: &Vec3f, delta: f32) -> Vec3f {
+        let p = *p;
+        let dx = Vec3f::new(delta, 0.0, 0.0);
+        let dy = Vec3f::new(0.0, delta, 0.0);
+        let dz = Vec3f::new(0.0, 0.0, delta);
+        let dfdx = self.dist(&(p + dx)) - self.dist(&(p - dx));
+        let dfdy = self.dist(&(p + dy)) - self.dist(&(p - dy));
+        let dfdz = self.dist(&(p + dz)) - self.dist(&(p - dz));
+        Vec3f { x: dfdx, y: dfdy, z: dfdz } / (2.0 * delta)
+    }
+}
+
+pub trait Isosurface {
+    fn dist(&self, point: &Vec3f) -> f32;
+    fn grad(&self, p: &Vec3f, delta: f32) -> Vec3f;
+    fn surface_properties(&self) -> SurfaceProperties;
 }
 
 pub trait GeometryManager {
@@ -84,12 +111,7 @@ pub trait GeometryManager {
     fn nearest_intersection(&self, ray: &Ray) -> Option<SurfaceIntersection>;
     fn was_occluded(&self, ray: &Ray, dist: f32) -> bool;
     fn add_geometry<G>(&mut self, object: G) where G: GeometrySurface + 'static;
-    // fn build_aabbox(&self) -> AABBox;
-}
-
-pub trait DistanceField {
-    fn dist(&self, point: &Vec3f) -> f32;
-    fn normal(&self, point: &Vec3f) -> f32;
+    fn add_isosurface<I>(&mut self, object: I) where I: Isosurface + 'static;
 }
 
 impl<G> GeometrySurface for Surface<G> where G: Geometry {
@@ -100,73 +122,45 @@ impl<G> GeometrySurface for Surface<G> where G: Geometry {
             surface: self.properties,
         })
     }
-
-    // fn build_aabbox(&self) -> AABBox {
-    //     self.geometry.build_aabbox()
-    // }
 }
 
-impl DFSphere {
+impl DistanceField for Sphere {
     fn dist(&self, point: &Vec3f) -> f32 {
         (*point - self.center).norm() - self.radius
     }
 }
 
-impl Geometry for DFSphere {
-    // this is just as proof-of-concept.
-    // 1) it should be in separate trait for distance fields
-    // 2) d have to be devided by gradient value (see http://www.iquilezles.org/www/articles/distance/distance.htm)
-    // 3) cheat with normals: they are calculated analiticaly
-    //    but has to be calculated numericaly with differentials (for common case).
-    fn intersect(&self, ray: &Ray) -> Option<Intersection> {
-        let mut t = 0.0;
-        let mut dprev = 1e38;
-        for _ in 0..10000 {
-            let new_point = ray.orig + ray.dir * t;
-            let d = self.dist(&new_point);
-            if d < 1e-6 {
-                return Some(Intersection {
-                    dist: t,
-                    normal: (new_point - self.center).normalize()
-                })
-            }
-            if d > dprev {
-                return None;
-            }
-            dprev = d;
-            t += d;
-        }
-        None
+impl<A, B> DistanceField for DFieldsSubstr<A, B>
+    where A: DistanceField, B: DistanceField {
+    fn dist(&self, point: &Vec3f) -> f32 {
+        self.b.dist(point).max(-self.a.dist(point))
+    }
+}
+
+impl<A, B> DistanceField for DFieldsUnion<A, B>
+    where A: DistanceField, B: DistanceField {
+    fn dist(&self, point: &Vec3f) -> f32 {
+        self.a.dist(point).min(self.b.dist(point))
+    }
+}
+
+impl<D> Isosurface for DFieldIsosurface<D> where D: DistanceField {
+    fn dist(&self, point: &Vec3f) -> f32 {
+        self.dfield.dist(point)
+    }
+
+    fn grad(&self, p: &Vec3f, delta: f32) -> Vec3f {
+        self.dfield.grad(p, delta)
+    }
+
+    fn surface_properties(&self) -> SurfaceProperties {
+        self.properties
     }
 }
 
 impl Sphere {
     pub fn r2(&self) -> f32 {
         self.radius * self.radius
-    }
-}
-
-impl AABBox {
-    fn new_infinity() -> AABBox {
-        AABBox {
-            min: vec3_from_value(f32::INFINITY),
-            max: vec3_from_value(f32::NEG_INFINITY),
-        }
-    }
-
-    fn grow_mut(&mut self, other: &AABBox) {
-        self.min.x = self.min.x.min(other.min.x);
-        self.min.y = self.min.y.min(other.min.y);
-        self.min.z = self.min.z.min(other.min.z);
-        self.max.x = self.max.x.max(other.max.x);
-        self.max.y = self.max.y.max(other.max.y);
-        self.max.z = self.max.z.max(other.max.z);
-    }
-
-    fn grow(&self, other: &AABBox) -> AABBox {
-        let mut aabb = other.clone();
-        aabb.grow_mut(self);
-        aabb
     }
 }
 
@@ -177,46 +171,28 @@ impl Geometry for Sphere {
         let r2 = self.r2();
         let p_d = p.dot(&ray.dir);
 
-        // The sphere is behind or surrounding the start point.
         if p_d > 0.0 || p.dot(&p) < r2 {
             return None;
         }
 
-        // Flatten p into the plane passing through c perpendicular to the ray.
-        // This gives the closest approach of the ray to the center.
         let a = p - ray.dir * p_d;
-
         let a2 = a.dot(&a);
 
-        // Closest approach is outside the sphere.
         if a2 > r2 {
             return None;
         }
 
-        // Calculate distance from plane where ray enters/exits the sphere.
         let h = (r2 - a2).sqrt();
-
-        // Calculate intersection point relative to sphere center.
         let i = a - ray.dir * h;
 
         let intersection = self.center + i;
         let normal = i.normalize();
-        // We've taken a shortcut here to avoid a second square root.
-        // Note numerical errors can make the normal have length slightly different from 1.
-        // If you need higher precision, you may need to perform a conventional normalization.
 
         Some(Intersection {
             normal: normal,
             dist: (intersection - ray.orig).norm(),
         })
     }
-
-    // fn build_aabbox(&self) -> AABBox {
-    //     AABBox {
-    //         min: self.center - vec3_from_value(self.radius),
-    //         max: self.center + vec3_from_value(self.radius)
-    //     }
-    // }
 }
 
 impl Triangle {
@@ -257,27 +233,10 @@ impl Geometry for Triangle {
             None
         }
     }
-
-    // fn build_aabbox(&self) -> AABBox {
-    //     let (mut min, mut max) = (self.vert[0], self.vert[1]);
-    //     for &v in self.vert.iter() {
-    //         for i in 0..3 {
-    //             min[i] = min[i].min(v[i]);
-    //             max[i] = max[i].max(v[i]);
-    //         }
-    //     }
-    //     AABBox { min: min, max: max }
-    // }
 }
 
-impl GeometryManager for GeometryList {
-    fn new() -> GeometryList {
-        GeometryList {
-            geometries: Vec::new()
-        }
-    }
-
-    fn nearest_intersection(&self, ray: &Ray) -> Option<SurfaceIntersection> {
+impl GeometryList {
+    fn nearest_geo_isect(&self, ray: &Ray) -> Option<SurfaceIntersection> {
         self.geometries.iter()
             .map(|ref g| g.intersect(&ray))
             .fold(None, |curr, isect|
@@ -287,25 +246,68 @@ impl GeometryManager for GeometryList {
             )
     }
 
+    fn nearest_isosuface_isect(&self, ray: &Ray, max_dist: f32) -> Option<SurfaceIntersection> {
+        let mut t = 0.0;
+        for _ in 0..MAX_DFIELD_STEPS {
+            let new_point = ray.orig + ray.dir * t;
+
+            let mut d = max_dist;
+            for ref df in self.dfields.iter() {
+                let grad = df.grad(&new_point, 1e-6);
+                let dist = df.dist(&new_point) / grad.norm();
+                d = d.min(dist);
+                if dist < EPS_DIST_FIELD {
+                    return Some(SurfaceIntersection {
+                        normal: grad.normalize(),
+                        dist: t + d,
+                        surface: df.surface_properties()
+                    })
+                }
+            }
+
+            t += d;
+            if t > max_dist {
+                return None;
+            }
+        }
+        None
+    }
+}
+
+impl GeometryManager for GeometryList {
+    fn new() -> GeometryList {
+        GeometryList {
+            geometries: Vec::new(),
+            dfields: Vec::new()
+        }
+    }
+
+    fn nearest_intersection(&self, ray: &Ray) -> Option<SurfaceIntersection> {
+        let isect = self.nearest_geo_isect(ray);
+        self.nearest_isosuface_isect(ray, isect.map_or(1e35, |isec| isec.dist)).or(isect)
+    }
+
     fn was_occluded(&self, ray: &Ray, dist: f32) -> bool {
-        self.geometries.iter()
+        let occluded_by_geo = self.geometries.iter()
             .map(|ref g| g.intersect(&ray))
             .any(|isect| isect.map_or(false, |isec| {
                 isec.dist < dist
-            }))
+            }));
+
+        if occluded_by_geo {
+            true
+        } else {
+            self.nearest_isosuface_isect(ray, dist).is_some()
+        }
     }
 
     fn add_geometry<G>(&mut self, object: G) where G: GeometrySurface + 'static {
         self.geometries.push(Box::new(object));
     }
 
-    // fn build_aabbox(&self) -> AABBox {
-    //     let mut aabb = AABBox::new_infinity();
-    //     for geo in self.geometries.iter() {
-    //         aabb.grow_mut(&geo.build_aabbox());
-    //     }
-    //     aabb
-    // }
+    fn add_isosurface<I>(&mut self, object: I) where I: Isosurface + 'static {
+        self.dfields.push(Box::new(object));
+    }
 }
 
 impl Frame {

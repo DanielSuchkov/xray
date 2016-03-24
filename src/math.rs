@@ -96,3 +96,8 @@ pub fn ortho(v: &Vec3f) -> Vec3f {
         Vec3f::new(0.0, -v.z, v.y)
     }
 }
+
+pub fn smin(a: f32, b: f32, k: f32 ) -> f32 {
+    let res = (-k*a).exp() + (-k*b).exp();
+    -res.ln() / k
+}

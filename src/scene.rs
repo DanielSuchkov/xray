@@ -1,7 +1,10 @@
 #![allow(dead_code)]
 use brdf::Material;
 use geometry;
-use geometry::{/*BSphere, */Geometry, GeometryManager, Ray, Surface, SurfaceIntersection};
+use geometry::{
+    Geometry, GeometryManager, Ray, Surface, SurfaceIntersection,
+    Isosurface, DistanceField, DFieldIsosurface
+};
 use light::{Light, BackgroundLight, LuminousObject, Luminous};
 use math::{vec3_from_value, Vec3f, EPS_RAY, One};
 use math::vector_traits::*;
@@ -28,6 +31,8 @@ pub trait Scene {
     fn was_occluded(&self, ray: &Ray, dist: f32) -> bool;
 
     fn add_object<G>(&mut self, geo: G, material: Material) where G: Geometry + 'static;
+    fn add_isosurface<D>(&mut self, dfield: D, material: Material)
+        where D: DistanceField + 'static;
     fn add_light<L>(&mut self, light: L) where L: Light + 'static;
     fn add_luminous_object<G>(&mut self, geo: G, intensity: Vec3f)
         where G: Geometry + Luminous + Clone + 'static;
@@ -59,15 +64,15 @@ impl<T> Scene for DefaultScene<T> where T: GeometryManager {
         })
     }
 
-    // fn bounding_sphere(&self) -> BSphere {
-    //     let aabb = self.geo.build_aabbox();
-    //     let radius2 = (aabb.max - aabb.min).sqnorm();
-    //     BSphere {
-    //         center: (aabb.min + aabb.max) * 0.5,
-    //         radius: radius2.sqrt(),
-    //         inv_radius_sqr: 1.0 / radius2
-    //     }
-    // }
+    fn add_isosurface<D>(&mut self, dfield: D, material: Material)
+        where D: DistanceField + 'static {
+        let material_id = self.materials.len() as i32;
+        self.materials.push(material);
+        self.geo.add_isosurface(DFieldIsosurface {
+            dfield: dfield,
+            properties: SurfaceProperties::Material(material_id)
+        })
+    }
 
     fn get_material(&self, m_id: MaterialID) -> &Material {
         &self.materials[m_id as usize]
