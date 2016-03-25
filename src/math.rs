@@ -67,6 +67,10 @@ pub fn mix(a: f32, b: f32, mix: f32) -> f32 {
     b * mix + a * (1.0 - mix)
 }
 
+pub fn clamp(x: f32, min: f32, max: f32) -> f32 {
+    x.max(min).min(max)
+}
+
 pub fn vec3_from_value<T: BaseFloat>(val: T) -> Vec3<T> {
     Vec3::new(val, val, val)
 }
@@ -97,7 +101,18 @@ pub fn ortho(v: &Vec3f) -> Vec3f {
     }
 }
 
-pub fn smin(a: f32, b: f32, k: f32 ) -> f32 {
+pub fn smin_exp(a: f32, b: f32, k: f32 ) -> f32 {
     let res = (-k*a).exp() + (-k*b).exp();
     -res.ln() / k
+}
+
+pub fn smin_pow(a: f32, b: f32, k: f32) -> f32 {
+    let a = a.powf(k);
+    let b = b.powf(k);
+    ((a * b) / (a + b)).powf(1.0 / k)
+}
+
+pub fn smin_poly(a: f32, b: f32, k: f32) -> f32 {
+    let h = clamp(0.5 + 0.5 * (b - a) / k, 0.0, 1.0);
+    mix(b, a, h) - k * h * (1.0 - h)
 }

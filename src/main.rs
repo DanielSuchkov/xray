@@ -20,7 +20,7 @@ use sfml::window::{VideoMode, ContextSettings, event, window_style};
 
 use brdf::Material;
 use camera::{PerspectiveCamera, CameraBuilder, Camera};
-use geometry::{GeometryList, Sphere, Triangle, DFieldsSubstr};
+use geometry::{GeometryList, Sphere, Torus, Triangle, DFieldsSubstr, DFieldsBlend, RoundBox};
 use math::{Vec3f, Vec2u, One, Zero, vec3_from_value};
 use render::Render;
 use light::{/*AreaLight, */PointLight, BackgroundLight};
@@ -38,6 +38,7 @@ fn f32_to_u8(f: f32) -> u8 {
 
 fn main() {
     let res = Vec2u::new(1000, 1000);
+    // let res = Vec2u::new(500, 500);
     let mut window = RenderWindow::new(
             VideoMode::new_init(res.x as u32, res.y as u32, 32),
             "XRay",
@@ -106,6 +107,12 @@ fn main() {
     };
 
     let white_ceramics = Material {
+        diffuse: vec3_from_value(0.99),
+        specular: vec3_from_value(0.5),
+        phong_exp: 1000.0
+    };
+
+    let mirror = Material {
         diffuse: vec3_from_value(0.5),
         specular: vec3_from_value(0.99),
         phong_exp: 10000.0
@@ -139,9 +146,9 @@ fn main() {
     // });
 
     scene.add_luminous_object(
-        Sphere { center: Vec3f::new(1.2, 0.7, 0.0), radius: 0.4 },
-        // daylight_color * 4.0
-        vec3_from_value(30.0)
+        Sphere { center: Vec3f::new(0.0, 1.7, 0.0), radius: 0.7 },
+        daylight_color * 15.0
+        // vec3_from_value(10.0)
     );
 
     {
@@ -166,19 +173,69 @@ fn main() {
         scene.add_object(Triangle::new(cb[6], cb[2], cb[1]), green_diffuse);
     }
 
-    // scene.add_isosurface(Sphere { center: Vec3f::new(1.25, 1.1, 0.45), radius: 0.7 }, white_ceramics);
+    // scene.add_isosurface(Sphere { center: Vec3f::new(1.25, 1.1, 0.45), radius: 0.7 }, mirror);
+
+    // scene.add_isosurface(
+    //     DFieldsBlend {
+    //         a: Sphere { center: Vec3f::new(0.50, 0.0, 0.0), radius: 0.5 },
+    //         b: Sphere { center: Vec3f::new(-0.50, 0.0, 0.0), radius: 0.5 },
+    //         // pos: Vec3f::new(0.3, -1.1, 0.45),
+    //         pos: Vec3f::new(0.4, -0.7, 0.0),
+    //         k: 0.4
+    //     },
+    //     white_diffuse
+    // );
+
     scene.add_isosurface(
         DFieldsSubstr {
-            a: Sphere { center: Vec3f::new(0.0, 0.0, 0.0), radius: 1.2 },
-            b: Sphere { center: Vec3f::new(-0.4, 0.0, 0.0), radius: 1.0 },
-            // pos: Vec3f::new(0.3, -1.1, 0.45),
-            pos: Vec3f::new(0.5, 0.7, 0.0),
+            a: DFieldsBlend {
+                a: DFieldsBlend {
+                    a: Torus { radius: 0.3, thickness: 0.10, center: Vec3f::new(-0.4, 0.0, 0.0) },
+                    b: Torus { radius: 0.5, thickness: 0.25, center: Vec3f::new( 0.4, 0.0, 0.0) },
+                    k: 0.5,
+                    pos: Vec3f::zero()
+                },
+                b: Sphere { center: Vec3f::new(-0.5, 0.6, 0.0), radius: 0.4 },
+                k: 0.5,
+                pos: Vec3f::zero()
+            },
+            b: Sphere { center: Vec3f::new(0.2, 0.4, 0.1), radius: 0.5 },
+            pos: Vec3f::new(0.4, -0.7, 0.5),
         },
-        white_ceramics
+        mirror
     );
 
-    scene.add_object(Sphere { center: Vec3f::new(-1.0, -1.7, 0.2), radius: 0.8 }, white_ceramics);
-    scene.add_object(Sphere { center: Vec3f::new(1.2, -1.9, 0.0), radius: 0.6 }, sky_blue_diffuse);
+    scene.add_isosurface(
+        DFieldsSubstr {
+            a: RoundBox {
+                pos: Vec3f::zero(),
+                dim: Vec3f::new(0.5, 0.5, 0.5),
+                r: 0.2
+            },
+            b: Torus {
+                radius: 0.6,
+                thickness: 0.3,
+                center: Vec3f::new(0.0, 0.0, -0.42)
+            },
+            pos: Vec3f::new(-1.0, -1.7, 0.2)
+        },
+        golden_spec
+    );
+
+    scene.add_isosurface(
+        DFieldsSubstr {
+            a: Sphere { center: Vec3f::zero(), radius: 0.6 },
+            b: RoundBox {
+                pos: Vec3f::new(-0.2, 0.4, -0.4),
+                dim: Vec3f::new(0.3, 0.3, 0.3),
+                r: 0.2
+            },
+            pos: Vec3f::new(1.2, -1.9, 0.0)
+        },
+        white_diffuse
+    );
+    // scene.add_object(Sphere { center: Vec3f::new(-1.0, -1.7, 0.2), radius: 0.8 }, mirror);
+    // scene.add_object(Sphere { center: Vec3f::new(1.2, -1.9, 0.0), radius: 0.6 }, sky_blue_diffuse);
 
     let mut ren = CpuPathTracer::new(cam, scene);
     let mut iter_nb = 0;

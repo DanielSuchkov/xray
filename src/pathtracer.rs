@@ -10,6 +10,8 @@ use render::Render;
 use scene::{Scene, SurfaceProperties};
 use nalgebra::ApproxEq;
 
+const MAX_PATH_LENGTH: u32 = 100;
+
 pub struct CpuPathTracer<S: Scene> {
     frame: FrameBuffer,
     scene: S,
@@ -40,8 +42,6 @@ fn mis2(current_pdf_w: f32, other_pdf_w: f32) -> f32 {
     // balance_heuristic(current_pdf_w, other_pdf_w)
     power_heuristic(current_pdf_w, other_pdf_w)
 }
-
-const MAX_PATH_LENGTH: u32 = 100;
 
 impl<S> CpuPathTracer<S> where S: Scene {
     fn uniform_sample_one_light(&mut self, p: &Vec3f, brdf: &Brdf) -> Vec3f {

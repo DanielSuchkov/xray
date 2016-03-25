@@ -1,12 +1,12 @@
 #![allow(dead_code)]
 use math::vector_traits::*;
-use math::{Vec3f, ortho, vec3_from_value, EPS_RAY, smin};
+use math::{Vec3f, ortho, vec3_from_value, EPS_RAY, smin_exp, smin_poly, smin_pow};
 use scene::SurfaceProperties;
 use std::f32;
 use std::rc::Rc;
 
-const EPS_DIST_FIELD: f32 = 1e-6;
-const MAX_DFIELD_STEPS: usize = 256;
+const EPS_DIST_FIELD: f32 = 1e-4;
+const MAX_DFIELD_STEPS: usize = 512;
 
 #[derive(Debug, Clone, Copy)]
 pub struct SurfaceIntersection {
@@ -64,19 +64,37 @@ pub struct GeometryList {
 }
 
 pub struct DFieldsSubstr<A, B>
-    where A: DistanceField,
-          B: DistanceField {
+    where A: DistanceField, B: DistanceField {
     pub a: A,
     pub b: B,
     pub pos: Vec3f,
 }
 
 pub struct DFieldsUnion<A, B>
-    where A: DistanceField,
-          B: DistanceField {
+    where A: DistanceField, B: DistanceField {
     pub a: A,
     pub b: B,
     pub pos: Vec3f,
+}
+
+pub struct DFieldsBlend<A, B>
+    where A: DistanceField, B: DistanceField {
+    pub a: A,
+    pub b: B,
+    pub k: f32,
+    pub pos: Vec3f,
+}
+
+pub struct Torus {
+    pub radius: f32,
+    pub thickness: f32,
+    pub center: Vec3f
+}
+
+pub struct RoundBox {
+    pub dim: Vec3f,
+    pub pos: Vec3f,
+    pub r: f32,
 }
 
 pub trait Geometry {
@@ -132,6 +150,26 @@ impl DistanceField for Sphere {
     }
 }
 
+impl DistanceField for Torus {
+    fn dist(&self, point: &Vec3f) -> f32 {
+        let point = *point - self.center;
+        let q = Vec2::new(Vec2::new(point.x, point.y).norm() - self.radius, point.z);
+        q.norm() - self.thickness
+    }
+}
+
+impl DistanceField for RoundBox {
+    fn dist(&self, point: &Vec3f) -> f32 {
+        let p = *point - self.pos;
+        let abs_pb = Vec3f{
+            x: (p.x.abs() - self.dim.x).max(0.0),
+            y: (p.y.abs() - self.dim.y).max(0.0),
+            z: (p.z.abs() - self.dim.z).max(0.0)
+        };
+        abs_pb.norm() - self.r
+    }
+}
+
 impl<A, B> DistanceField for DFieldsSubstr<A, B>
     where A: DistanceField, B: DistanceField {
     fn dist(&self, point: &Vec3f) -> f32 {
@@ -145,6 +183,14 @@ impl<A, B> DistanceField for DFieldsUnion<A, B>
     fn dist(&self, point: &Vec3f) -> f32 {
         let point = *point - self.pos;
         self.a.dist(&point).min(self.b.dist(&point))
+    }
+}
+
+impl<A, B> DistanceField for DFieldsBlend<A, B>
+    where A: DistanceField, B: DistanceField {
+    fn dist(&self, point: &Vec3f) -> f32 {
+        let point = *point - self.pos;
+        smin_poly(self.a.dist(&point), self.b.dist(&point), self.k)
     }
 }
 
@@ -251,16 +297,20 @@ impl GeometryList {
     }
 
     fn nearest_isosuface_isect(&self, ray: &Ray, max_dist: f32) -> Option<SurfaceIntersection> {
+        if self.dfields.is_empty() {
+            return None;
+        }
+
         let mut t = 0.0;
         for _ in 0..MAX_DFIELD_STEPS {
             let new_point = ray.orig + ray.dir * t;
 
             let mut d = max_dist;
             for ref df in self.dfields.iter() {
-                let grad = df.grad(&new_point, 1e-3);
-                let dist = df.dist(&new_point) / grad.norm();
+                let dist = df.dist(&new_point)/* / grad.norm()*/;
                 d = d.min(dist);
                 if dist < EPS_DIST_FIELD {
+                    let grad = df.grad(&new_point, 1e-3);
                     return Some(SurfaceIntersection {
                         normal: grad.normalize(),
                         dist: t + d,
