@@ -20,8 +20,8 @@ use sfml::window::{VideoMode, ContextSettings, event, window_style};
 
 use brdf::Material;
 use camera::{PerspectiveCamera, CameraBuilder, Camera};
-use geometry::{GeometryList, Sphere, Torus, Triangle, DFieldsSubstr, DFieldsBlend, RoundBox};
-use math::{Vec3f, Vec2u, One, Zero, vec3_from_value};
+use geometry::{GeometryList, Sphere, Torus, Triangle, DFieldsSubstr, DFieldsBlend, RoundBox, DFieldDisplace};
+use math::{Vec3f, Vec2u, One, Zero, vec3_from_value, triple_sin};
 use render::Render;
 use light::{/*AreaLight, */PointLight, BackgroundLight};
 use render::EyeLight;
@@ -106,6 +106,12 @@ fn main() {
         phong_exp: 10.0
     };
 
+    let golden_mirror = Material {
+        diffuse: Vec3f::new(1.0, 0.7, 0.3) * 0.5,
+        specular: Vec3f::new(1.0, 0.7, 0.3),
+        phong_exp: 1000.0
+    };
+
     let white_ceramics = Material {
         diffuse: vec3_from_value(0.99),
         specular: vec3_from_value(0.5),
@@ -115,6 +121,12 @@ fn main() {
     let mirror = Material {
         diffuse: vec3_from_value(0.5),
         specular: vec3_from_value(0.99),
+        phong_exp: 10000.0
+    };
+
+    let sky_blue_mirror = Material {
+        diffuse: Vec3f::new(0.1, 0.9, 0.9) * 0.5,
+        specular: Vec3f::new(0.1, 0.9, 0.9),
         phong_exp: 10000.0
     };
 
@@ -173,7 +185,13 @@ fn main() {
         scene.add_object(Triangle::new(cb[6], cb[2], cb[1]), green_diffuse);
     }
 
-    // scene.add_isosurface(Sphere { center: Vec3f::new(1.25, 1.1, 0.45), radius: 0.7 }, mirror);
+    scene.add_isosurface(
+        DFieldDisplace {
+            a: Sphere { center: Vec3f::new(1.0, -1.6, -1.0), radius: 0.6 },
+            disp: triple_sin
+        },
+        mirror
+    );
 
     // scene.add_isosurface(
     //     DFieldsBlend {
@@ -190,50 +208,55 @@ fn main() {
         DFieldsSubstr {
             a: DFieldsBlend {
                 a: DFieldsBlend {
-                    a: Torus { radius: 0.3, thickness: 0.10, center: Vec3f::new(-0.4, 0.0, 0.0) },
-                    b: Torus { radius: 0.5, thickness: 0.25, center: Vec3f::new( 0.4, 0.0, 0.0) },
+                    a: Torus { radius: 0.3, thickness: 0.15, center: Vec3f::new(-0.5, 0.0, 0.0) },
+                    b: Torus { radius: 0.5, thickness: 0.25, center: Vec3f::new( 0.5, 0.0, 0.0) },
                     k: 0.5,
                     pos: Vec3f::zero()
                 },
-                b: Sphere { center: Vec3f::new(-0.5, 0.6, 0.0), radius: 0.4 },
+                b: Sphere { center: Vec3f::new(1.2, 0.2, -0.4), radius: 0.4 },
                 k: 0.5,
                 pos: Vec3f::zero()
             },
             b: Sphere { center: Vec3f::new(0.2, 0.4, 0.1), radius: 0.5 },
-            pos: Vec3f::new(0.4, -0.7, 0.5),
+            // pos: Vec3f::new(-1.3, -1.6, -0.8)
+            pos: Vec3f::new(-0.3, -0.7, 0.5),
         },
-        mirror
+        sky_blue_mirror
     );
 
     scene.add_isosurface(
         DFieldsSubstr {
             a: RoundBox {
                 pos: Vec3f::zero(),
-                dim: Vec3f::new(0.5, 0.5, 0.5),
-                r: 0.2
+                dim: Vec3f::new(0.4, 0.4, 0.4),
+                r: 0.3
             },
             b: Torus {
-                radius: 0.6,
-                thickness: 0.3,
-                center: Vec3f::new(0.0, 0.0, -0.42)
+                radius: 0.4,
+                thickness: 0.4,
+                center: Vec3f::new(0.0, 0.0, -0.3)
             },
-            pos: Vec3f::new(-1.0, -1.7, 0.2)
+            pos: Vec3f::new(-1.3, -1.8, -0.5)
         },
-        golden_spec
+        mirror
     );
 
-    scene.add_isosurface(
-        DFieldsSubstr {
-            a: Sphere { center: Vec3f::zero(), radius: 0.6 },
-            b: RoundBox {
-                pos: Vec3f::new(-0.2, 0.4, -0.4),
-                dim: Vec3f::new(0.3, 0.3, 0.3),
-                r: 0.2
-            },
-            pos: Vec3f::new(1.2, -1.9, 0.0)
-        },
-        white_diffuse
-    );
+    // scene.add_isosurface(
+    //     DFieldsSubstr {
+    //         a: DFieldsSubstr {
+    //             a: RoundBox {
+    //                 pos: Vec3f::zero(),
+    //                 dim: Vec3f::new(0.4, 0.4, 0.4),
+    //                 r: 0.2
+    //             },
+    //             b: Sphere { center: Vec3f::new(0.0, 0.4, 0.0), radius: 0.5 },
+    //             pos: Vec3f::zero(),
+    //         },
+    //         b: Sphere { center: Vec3f::new(0.0, 0.0, -0.4), radius: 0.5 },
+    //         pos: Vec3f::new(1.2, -1.9, -0.4)
+    //     },
+    //     white_diffuse
+    // );
     // scene.add_object(Sphere { center: Vec3f::new(-1.0, -1.7, 0.2), radius: 0.8 }, mirror);
     // scene.add_object(Sphere { center: Vec3f::new(1.2, -1.9, 0.0), radius: 0.6 }, sky_blue_diffuse);
 

@@ -5,7 +5,8 @@ use scene::SurfaceProperties;
 use std::f32;
 use std::rc::Rc;
 
-const EPS_DIST_FIELD: f32 = 1e-4;
+const EPS_DIST_FIELD: f32 = 5e-7;
+const DELTA_GRAD: f32 = 1e-3;
 const MAX_DFIELD_STEPS: usize = 512;
 
 #[derive(Debug, Clone, Copy)]
@@ -31,6 +32,13 @@ pub struct Surface<G: Geometry> {
 pub struct DFieldIsosurface<D: DistanceField> {
     pub dfield: D,
     pub properties: SurfaceProperties
+}
+
+pub struct DFieldDisplace<D, F>
+    where D: DistanceField,
+          F: Fn(&Vec3f) -> f32 {
+    pub a: D,
+    pub disp: F
 }
 
 #[derive(Debug, Clone, Copy)]
@@ -194,6 +202,16 @@ impl<A, B> DistanceField for DFieldsBlend<A, B>
     }
 }
 
+impl<D, F> DistanceField for DFieldDisplace<D, F>
+    where D: DistanceField,
+          F: Fn(&Vec3f) -> f32 {
+    fn dist(&self, point: &Vec3f) -> f32 {
+        let d1 = self.a.dist(point);
+        let d2 = (self.disp)(point);
+        d1 + d2
+    }
+}
+
 impl<D> Isosurface for DFieldIsosurface<D> where D: DistanceField {
     fn dist(&self, point: &Vec3f) -> f32 {
         self.dfield.dist(point)
@@ -307,10 +325,11 @@ impl GeometryList {
 
             let mut d = max_dist;
             for ref df in self.dfields.iter() {
+                // let grad = df.grad(&new_point, DELTA_GRAD);
                 let dist = df.dist(&new_point)/* / grad.norm()*/;
                 d = d.min(dist);
                 if dist < EPS_DIST_FIELD {
-                    let grad = df.grad(&new_point, 1e-3);
+                    let grad = df.grad(&new_point, DELTA_GRAD);
                     return Some(SurfaceIntersection {
                         normal: grad.normalize(),
                         dist: t + d,

@@ -60,6 +60,7 @@ pub type Mat4f = Mat4<f32>;
 pub type Rot3f = Rot3<f32>;
 pub type Vec4f = Vec4<f32>;
 pub type Vec3f = Vec3<f32>;
+pub type Vec3d = Vec3<f64>;
 pub type Vec2f = Vec2<f32>;
 pub type Vec2u = Vec2<usize>;
 
@@ -115,4 +116,8 @@ pub fn smin_pow(a: f32, b: f32, k: f32) -> f32 {
 pub fn smin_poly(a: f32, b: f32, k: f32) -> f32 {
     let h = clamp(0.5 + 0.5 * (b - a) / k, 0.0, 1.0);
     mix(b, a, h) - k * h * (1.0 - h)
+}
+
+pub fn triple_sin(p: &Vec3f) -> f32 {
+    0.05 * (11.0 * p.x).sin() * (11.0 * p.y).sin() * (11.0 * p.z).sin()
 }
