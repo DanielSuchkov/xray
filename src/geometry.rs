@@ -1,13 +1,16 @@
 #![allow(dead_code)]
 use math::vector_traits::*;
-use math::{Vec3f, ortho, vec3_from_value, EPS_RAY, smin_exp, smin_poly, smin_pow};
+use math;
+use math::{Vec3f, ortho, vec3_from_value, smin_exp, smin_poly, smin_pow};
 use scene::SurfaceProperties;
 use std::f32;
 use std::rc::Rc;
 
-const EPS_DIST_FIELD: f32 = 5e-7;
-const DELTA_GRAD: f32 = 1e-3;
-const MAX_DFIELD_STEPS: usize = 512;
+pub const EPS_DIST_FIELD: f32 = 1e-4;
+pub const EPS_RAY_GEO: f32 = 1e-2;
+pub const EPS_RAY_DF: f32 = 1e-2;
+pub const DELTA_GRAD: f32 = 1e-4;
+pub const MAX_DFIELD_STEPS: usize = 1024;
 
 #[derive(Debug, Clone, Copy)]
 pub struct SurfaceIntersection {
@@ -327,15 +330,16 @@ impl GeometryList {
             for ref df in self.dfields.iter() {
                 // let grad = df.grad(&new_point, DELTA_GRAD);
                 let dist = df.dist(&new_point)/* / grad.norm()*/;
-                d = d.min(dist);
                 if dist < EPS_DIST_FIELD {
+                    let new_point = ray.orig + ray.dir * (t + dist);
                     let grad = df.grad(&new_point, DELTA_GRAD);
                     return Some(SurfaceIntersection {
                         normal: grad.normalize(),
-                        dist: t + d,
+                        dist: t + dist,
                         surface: df.surface_properties()
                     })
                 }
+                d = d.min(dist);
             }
 
             t += d;
@@ -356,21 +360,27 @@ impl GeometryManager for GeometryList {
     }
 
     fn nearest_intersection(&self, ray: &Ray) -> Option<SurfaceIntersection> {
-        let isect = self.nearest_geo_isect(ray);
-        self.nearest_isosuface_isect(ray, isect.map_or(10000.0, |isec| isec.dist)).or(isect)
+        let ray_geo = Ray { dir: ray.dir, orig: ray.orig + ray.dir * EPS_RAY_GEO };
+        let isect = self.nearest_geo_isect(&ray_geo);
+        let ray_df = Ray { dir: ray.dir, orig: ray.orig + ray.dir * EPS_RAY_DF };
+        self.nearest_isosuface_isect(&ray_df, isect.map_or(10000.0, |isec| isec.dist)).or(isect)
     }
 
     fn was_occluded(&self, ray: &Ray, dist: f32) -> bool {
+        let ray_geo = Ray { dir: ray.dir, orig: ray.orig + ray.dir * EPS_RAY_GEO };
+        let dist_geo = dist - 2.0 * EPS_RAY_GEO;
         let occluded_by_geo = self.geometries.iter()
-            .map(|ref g| g.intersect(&ray))
+            .map(|ref g| g.intersect(&ray_geo))
             .any(|isect| isect.map_or(false, |isec| {
-                isec.dist < dist
+                isec.dist < dist_geo
             }));
 
         if occluded_by_geo {
             true
         } else {
-            self.nearest_isosuface_isect(ray, dist).is_some()
+            let ray_df = Ray { dir: ray.dir, orig: ray.orig + ray.dir * EPS_RAY_DF };
+            let dist_df = dist - 2.0 * EPS_RAY_DF;
+            self.nearest_isosuface_isect(&ray_df, dist_df).is_some()
         }
     }
 
@@ -431,7 +441,7 @@ impl Frame {
 
 mod tests {
     use super::*;
-    use math::{Vec3f, EPS_RAY};
+    use math::Vec3f;
     use scene::SurfaceProperties;
 
     #[test]

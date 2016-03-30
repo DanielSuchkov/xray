@@ -78,6 +78,10 @@ impl Brdf {
         }
     }
 
+    pub fn normal(&self) -> Vec3f {
+        self.own_basis.normal()
+    }
+
     fn lambert_sample(&self, rnd: (f32, f32)) -> Option<BrdfSample> {
         let wi_local = cos_hemisphere_sample(rnd);
         let pdf = self.lambert_pdf(&wi_local);

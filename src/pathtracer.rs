@@ -4,7 +4,7 @@ use camera::PerspectiveCamera;
 use framebuffer::FrameBuffer;
 use geometry::{Frame, Ray};
 use math::vector_traits::*;
-use math::{Vec2u, Vec3f, Vec2f, Zero, One, EPS_RAY, vec3_from_value};
+use math::{Vec2u, Vec3f, Vec2f, Zero, One, vec3_from_value};
 use rand::{StdRng, Rng, SeedableRng};
 use render::Render;
 use scene::{Scene, SurfaceProperties};
@@ -56,7 +56,7 @@ impl<S> CpuPathTracer<S> where S: Scene {
         // brdf sampling
         let sample_rnds = (self.rng.next_f32(), self.rng.next_f32(), self.rng.next_f32());
         if let Some(sample) = brdf.sample(sample_rnds) {
-            let brdf_ray = Ray { dir: sample.wi, orig: *p + sample.wi * EPS_RAY };
+            let brdf_ray = Ray { dir: sample.wi, orig: *p };
             if let Some(isect) = self.scene.nearest_intersection(&brdf_ray) {
                 match isect.surface {
                     SurfaceProperties::Light(light_id) if light_nb == light_id => {
@@ -153,7 +153,7 @@ impl<S> Render<S> for CpuPathTracer<S> where S: Scene {
                 if let Some(sample) = brdf.sample(sample_rnds) {
                     path_weight = path_weight * sample.radiance;
                     ray.dir = sample.wi;
-                    ray.orig = hit_point + ray.dir * EPS_RAY;
+                    ray.orig = hit_point;
                 } else {
                     break 'current_path;
                 }

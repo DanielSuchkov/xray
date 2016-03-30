@@ -6,7 +6,7 @@ use geometry::{
     Isosurface, DistanceField, DFieldIsosurface
 };
 use light::{Light, BackgroundLight, LuminousObject, Luminous};
-use math::{vec3_from_value, Vec3f, EPS_RAY, One};
+use math::{vec3_from_value, Vec3f, One};
 use math::vector_traits::*;
 use std::rc::Rc;
 
@@ -50,8 +50,7 @@ impl<T> Scene for DefaultScene<T> where T: GeometryManager {
     }
 
     fn was_occluded(&self, ray: &Ray, dist: f32) -> bool {
-        let ray = Ray { orig: ray.orig + ray.dir * EPS_RAY, dir: ray.dir };
-        self.geo.was_occluded(&ray, dist - 2.0 * EPS_RAY)
+        self.geo.was_occluded(&ray, dist)
     }
 
     fn add_object<G>(&mut self, geo: G, material: Material)
