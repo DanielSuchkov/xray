@@ -1,10 +1,8 @@
-#![allow(dead_code)]
-use math::{Vec3f, Vec2f, Zero, EPS_COSINE, EPS_PHONG};
+use math::{Vec3f, Zero, EPS_COSINE};
 use math::vector_traits::*;
 use utility::{cos_hemisphere_sample, luminance, pow_cos_hemisphere_sample};
-use std::f32::consts::{FRAC_1_PI, PI};
-use geometry::{Frame, Ray};
-use std::ops::Add;
+use std::f32::consts::FRAC_1_PI;
+use geometry::{Frame};
 
 #[derive(Debug, Clone, PartialEq, Copy)]
 pub struct Material {

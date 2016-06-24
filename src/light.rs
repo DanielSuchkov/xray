@@ -1,17 +1,13 @@
 #![allow(dead_code)]
-use math::{Vec3f, Zero, EPS_COSINE};
+use math::Vec3f;
 use math::vector_traits::*;
 use geometry::{Frame, Geometry, Ray, Sphere};
 use utility::*;
-use brdf;
 use std::f32::consts::{FRAC_1_PI, PI};
-use std::rc::Rc;
-// use std::f32;
 
 #[derive(Debug, Clone)]
 pub struct BackgroundLight {
     pub intensity: Vec3f,
-    pub scale: f32
 }
 
 #[derive(Debug, Clone)]
@@ -52,16 +48,16 @@ pub trait Luminous {
 impl Light for BackgroundLight {
     fn radiate(&self, _out_ray: &Ray) -> Option<Radiation> {
         Some(Radiation {
-            radiance: self.intensity * self.scale,
+            radiance: self.intensity,
             pdf: 0.25 * FRAC_1_PI,
         })
     }
 
     fn illuminate(&self, _hit_pnt: &Vec3f, rnd: (f32, f32)) -> Option<Illumination> {
-        let (dir, pdf) = uniform_sphere_sample_w(rnd);
+        let (dir, pdf) = uniform_hemisphere_sample_w(rnd);
         Some(Illumination {
-            radiance: self.intensity * self.scale,
-            l_dir: dir,
+            radiance: self.intensity,
+            l_dir: -dir,
             l_dist: 1e38,
             pdf: pdf
         })

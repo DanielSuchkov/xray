@@ -1,4 +1,3 @@
-#![allow(unused_imports)]
 extern crate sfml;
 extern crate nalgebra;
 extern crate num;
@@ -14,41 +13,230 @@ pub mod pathtracer;
 pub mod render;
 pub mod scene;
 pub mod utility;
+pub mod materials_and_colors;
 
 use sfml::graphics::{RenderWindow, Color, RenderTarget, Texture, Sprite};
 use sfml::window::{VideoMode, ContextSettings, event, window_style};
 
-use brdf::Material;
 use camera::{PerspectiveCamera, CameraBuilder, Camera};
-use geometry::{GeometryList, Sphere, Torus, Triangle, DFieldsSubstr, DFieldsBlend, RoundBox, DFieldDisplace};
-use math::{Vec3f, Vec2u, One, Zero, vec3_from_value, triple_sin};
+use geometry::{GeometryList, Sphere, Torus, Triangle, DFieldsSubstr, DFieldsBlend, RoundBox};
+use math::{Vec3f, Vec2u, Zero};
 use render::Render;
-use light::{/*AreaLight, */PointLight, BackgroundLight};
+use light::{PointLight, BackgroundLight};
+#[allow(unused_imports)]
 use render::EyeLight;
 use pathtracer::CpuPathTracer;
 use scene::Scene;
+use std::io::prelude::*;
+use materials_and_colors::*;
 
 fn f32_to_u8(f: f32) -> u8 {
     (f.min(1.0) * 255.0) as u8
 }
 
-// fn vec3f_to_color(v: Vec3f) -> Color {
-//     Color::new_rgb(f32_to_u8(v.x), f32_to_u8(v.y), f32_to_u8(v.z))
-// }
+const CB: [Vec3f; 8] = [
+    Vec3f { x: -1.0, y:  1.0, z: -1.0 }, // 0
+    Vec3f { x:  1.0, y:  1.0, z: -1.0 }, // 1
+    Vec3f { x:  1.0, y:  1.0, z:  1.0 }, // 2
+    Vec3f { x: -1.0, y:  1.0, z:  1.0 }, // 3
+    Vec3f { x: -1.0, y: -1.0, z: -1.0 }, // 4
+    Vec3f { x:  1.0, y: -1.0, z: -1.0 }, // 5
+    Vec3f { x:  1.0, y: -1.0, z:  1.0 }, // 6
+    Vec3f { x: -1.0, y: -1.0, z:  1.0 }  // 7
+];
+
+fn add_cornell_box<S>(scene: &mut S, scale: f32) where S: Scene {
+    // floor
+    scene.add_object(Triangle::new(CB[5] * scale, CB[4] * scale, CB[7] * scale), WHITE_DIFFUSE);
+    scene.add_object(Triangle::new(CB[7] * scale, CB[6] * scale, CB[5] * scale), WHITE_DIFFUSE);
+
+    // ceiling
+    scene.add_object(Triangle::new(CB[2] * scale, CB[3] * scale, CB[0] * scale), WHITE_DIFFUSE);
+    scene.add_object(Triangle::new(CB[0] * scale, CB[1] * scale, CB[2] * scale), WHITE_DIFFUSE);
+
+    // back wall
+    scene.add_object(Triangle::new(CB[2] * scale, CB[6] * scale, CB[7] * scale), WHITE_DIFFUSE);
+    scene.add_object(Triangle::new(CB[7] * scale, CB[3] * scale, CB[2] * scale), WHITE_DIFFUSE);
+
+    // left wall
+    scene.add_object(Triangle::new(CB[3] * scale, CB[7] * scale, CB[4] * scale), RED_DIFFUSE);
+    scene.add_object(Triangle::new(CB[4] * scale, CB[0] * scale, CB[3] * scale), RED_DIFFUSE);
+
+    // right wall
+    scene.add_object(Triangle::new(CB[1] * scale, CB[5] * scale, CB[6] * scale), GREEN_DIFFUSE);
+    scene.add_object(Triangle::new(CB[6] * scale, CB[2] * scale, CB[1] * scale), GREEN_DIFFUSE);
+}
+
+#[allow(dead_code)]
+fn setup_mis_showcase() -> scene::DefaultScene<GeometryList> {
+    let mut scene = scene::DefaultScene::<GeometryList>::new(
+        BackgroundLight { intensity: DAYLIGHT_COLOR * 0.25 }
+    );
+
+    scene.add_luminous_object(
+        Sphere { center: Vec3f::new(0.0, 25.0, 0.0), radius: 5.0 },
+        DAYLIGHT_COLOR * 40.0
+    );
+
+    add_cornell_box(&mut scene, 25.0);
+
+    scene.add_object(Sphere { center: Vec3f::new(-16.0, -18.0, 2.0), radius: 7.0 }, MIRROR);
+    scene.add_object(Sphere { center: Vec3f::new(0.0, -18.0, 0.0), radius: 7.0 }, WHITE_CERAMICS);
+    scene.add_object(Sphere { center: Vec3f::new(16.0, -18.0, 0.0), radius: 7.0 }, WHITE_DIFFUSE);
+
+    scene
+}
+
+#[allow(dead_code)]
+fn setup_pointlight_showcase() -> scene::DefaultScene<GeometryList> {
+    let mut scene = scene::DefaultScene::<GeometryList>::new(
+        BackgroundLight { intensity: DAYLIGHT_COLOR * 0.0 }
+    );
+
+    scene.add_light(PointLight {
+        position: Vec3f::new(-20.0, -5.0, 0.0),
+        intensity: DAYLIGHT_COLOR * 1500.0
+    });
+
+    scene.add_light(PointLight {
+        position: Vec3f::new(20.0, -10.0, -10.0),
+        intensity: DAYLIGHT_COLOR * 1500.0
+    });
+
+    scene.add_light(PointLight {
+        position: Vec3f::new(-20.0, 10.0, 20.0),
+        intensity: MARGENTA_COLOR * 1000.0
+    });
+
+    scene.add_light(PointLight {
+        position: Vec3f::new(20.0, 10.0, 20.0),
+        intensity: SKY_BLUE_COLOR * 1000.0
+    });
+
+    scene.add_luminous_object(
+        Sphere { center: Vec3f::new(10.0, -3.0, 5.0), radius: 5.0 },
+        GOLDEN_COLOR * 7.0
+    );
+
+    add_cornell_box(&mut scene, 25.0);
+
+    scene.add_object(Sphere { center: Vec3f::new(-16.0, -18.0, 2.0), radius: 7.0 }, MIRROR);
+    scene.add_object(Sphere { center: Vec3f::new(0.0, -18.0, 7.0), radius: 7.0 }, GOLDEN_SPEC);
+    scene.add_object(Sphere { center: Vec3f::new(16.0, -18.0, 0.0), radius: 7.0 }, SKY_BLUE_DIFFUSE);
+
+    scene
+}
+
+#[allow(dead_code)]
+fn setup_df_showcase() -> scene::DefaultScene<GeometryList> {
+    let mut scene = scene::DefaultScene::<GeometryList>::new(
+        BackgroundLight { intensity: DAYLIGHT_COLOR * 0.5 }
+    );
+
+    scene.add_luminous_object(
+        Sphere { center: Vec3f::new(0.0, 25.0, 0.0), radius: 5.0 },
+        DAYLIGHT_COLOR * 30.0
+    );
+
+    add_cornell_box(&mut scene, 25.0);
+
+    scene.add_isosurface(
+        DFieldsSubstr {
+            a: DFieldsBlend {
+                a: DFieldsBlend {
+                    a: Torus { radius: 3.0, thickness: 1.5, center: Vec3f::new(-5.0, 0.0, 0.0) },
+                    b: Torus { radius: 5.0, thickness: 2.5, center: Vec3f::new( 5.0, 0.0, 0.0) },
+                    k: 5.0,
+                    pos: Vec3f::zero()
+                },
+                b: Sphere { center: Vec3f::new(12.0, 2.0, -4.0), radius: 4.0 },
+                k: 5.0,
+                pos: Vec3f::zero()
+            },
+            b: Sphere { center: Vec3f::new(2.0, 4.0, 1.0), radius: 5.0 },
+            // pos: Vec3f::new(-13.0, -16.0, -8.0)
+            pos: Vec3f::new(-3.0, -7.0, 5.0),
+        },
+        GOLDEN_SPEC
+    );
+
+    scene.add_isosurface(
+        DFieldsSubstr {
+            a: RoundBox {
+                pos: Vec3f::zero(),
+                dim: Vec3f::new(4.0, 4.0, 4.0),
+                r: 3.0
+            },
+            b: Torus {
+                radius: 4.0,
+                thickness: 4.0,
+                center: Vec3f::new(0.0, 0.0, -3.0)
+            },
+            pos: Vec3f::new(-13.0, -18.0, -5.0)
+        },
+        WHITE_CERAMICS
+    );
+
+    scene.add_isosurface(
+        DFieldsSubstr {
+            a: DFieldsSubstr {
+                a: RoundBox {
+                    pos: Vec3f::zero(),
+                    dim: Vec3f::new(4.0, 4.0, 4.0),
+                    r: 2.0
+                },
+                b: Sphere { center: Vec3f::new(0.0, 4.0, 0.0), radius: 5.0 },
+                pos: Vec3f::zero(),
+            },
+            b: Sphere { center: Vec3f::new(0.0, 0.0, -4.0), radius: 5.0 },
+            pos: Vec3f::new(12.0, -19.0, -4.0)
+        },
+        MIRROR
+    );
+
+    scene
+}
+
+#[allow(dead_code)]
+fn setup_df_blend_showcase() -> scene::DefaultScene<GeometryList> {
+    let mut scene = scene::DefaultScene::<GeometryList>::new(
+        BackgroundLight { intensity: DAYLIGHT_COLOR * 0.5 }
+    );
+
+    scene.add_luminous_object(
+        Sphere { center: Vec3f::new(0.0, 25.0, 0.0), radius: 5.0 },
+        DAYLIGHT_COLOR * 30.0
+    );
+
+    add_cornell_box(&mut scene, 25.0);
+    scene.add_isosurface(
+        DFieldsBlend {
+            a: Sphere { center: Vec3f::new(7.0, 0.0, 0.0), radius: 7.0 },
+            b: Sphere { center: Vec3f::new(-7.0, 0.0, 0.0), radius: 7.0 },
+            // pos: Vec3f::new(3.0, -11.0, 4.5),
+            pos: Vec3f::new(0.0, -7.0, 0.0),
+            k: 6.0
+        },
+        MIRROR
+    );
+
+    scene
+}
 
 fn main() {
     let res = Vec2u::new(1000, 1000);
     // let res = Vec2u::new(500, 500);
+    // let res = Vec2u::new(250, 250);
     let mut window = RenderWindow::new(
             VideoMode::new_init(res.x as u32, res.y as u32, 32),
-            "XRay",
+            "XRay-MIS",
             window_style::CLOSE,
             &ContextSettings::default())
         .expect("Cannot create a new Render Window.");
 
     let cam = CameraBuilder::<PerspectiveCamera>::new()
         .with_view_size(res)
-        .with_pos(Vec3f::new(0.0, 0.0, -860.0))
+        .with_pos(Vec3f::new(0.0, 0.0, -86.0))
         .with_look_at(Vec3f::new(0.0, 0.0, 1.0))
         .with_up(Vec3f::new(0.0, 1.0, 0.0))
         .with_fov(45.0)
@@ -56,211 +244,12 @@ fn main() {
         .with_zfar(10000.0)
         .build();
 
-    let white_diffuse = Material {
-        diffuse: vec3_from_value(0.99),
-        specular: Zero::zero(),
-        phong_exp: 1.0
-    };
+    // let scene = setup_mis_showcase();
+    // let scene = setup_df_showcase();
+    let scene = setup_df_blend_showcase();
+    // let scene = setup_pointlight_showcase();
 
-    let green_diffuse = Material {
-        diffuse: Vec3f::new(0.156863, 0.803922, 0.172549),
-        // diffuse: Vec3f::new(0.0, 1.0, 0.0),
-        specular: Zero::zero(),
-        phong_exp: 1.0
-    };
-
-    let red_diffuse = Material {
-        diffuse: Vec3f::new(0.803922, 0.152941, 0.172549),
-        // diffuse: Vec3f::new(1.0, 0.0, 0.0),
-        specular: Zero::zero(),
-        phong_exp: 1.0
-    };
-
-    let sky_blue_diffuse = Material {
-        diffuse: Vec3f::new(0.1, 0.9, 0.9),
-        specular: Zero::zero(),
-        phong_exp: 1.0
-    };
-
-    let blue_diffuse = Material {
-        diffuse: Vec3f::new(0.2, 0.2, 0.8),
-        specular: Zero::zero(),
-        phong_exp: 1.0
-    };
-
-    let margenta_diffuse = Material {
-        diffuse: Vec3f::new(0.8, 0.2, 0.6),
-        specular: Zero::zero(),
-        phong_exp: 1.0
-    };
-
-    let dark_mirror = Material {
-        diffuse: vec3_from_value(0.0), // Vec3f::new(0.5, 0.5, 0.2) * 0.7,
-        specular: vec3_from_value(0.50), // Vec3f::new(0.5, 0.5, 0.2) * 0.3,
-        phong_exp: 1000.0
-    };
-
-    let golden_spec = Material {
-        diffuse: Vec3f::new(0.0, 0.0, 0.0),
-        specular: Vec3f::new(1.0, 0.7, 0.3),
-        phong_exp: 10.0
-    };
-
-    let golden_mirror = Material {
-        diffuse: Vec3f::new(1.0, 0.7, 0.3) * 0.5,
-        specular: Vec3f::new(1.0, 0.7, 0.3),
-        phong_exp: 1000.0
-    };
-
-    let white_ceramics = Material {
-        diffuse: vec3_from_value(0.99),
-        specular: vec3_from_value(0.5),
-        phong_exp: 1000.0
-    };
-
-    let mirror = Material {
-        diffuse: vec3_from_value(0.5),
-        specular: vec3_from_value(0.99),
-        phong_exp: 10000.0
-    };
-
-    let sky_blue_mirror = Material {
-        diffuse: Vec3f::new(0.1, 0.9, 0.9) * 0.5,
-        specular: Vec3f::new(0.1, 0.9, 0.9),
-        phong_exp: 10000.0
-    };
-
-    let cb = [
-        Vec3f::new(-250.0,  250.0, -250.0), // 0
-        Vec3f::new( 250.0,  250.0, -250.0), // 1
-        Vec3f::new( 250.0,  250.0,  250.0), // 2
-        Vec3f::new(-250.0,  250.0,  250.0), // 3
-        Vec3f::new(-250.0, -250.0, -250.0), // 4
-        Vec3f::new( 250.0, -250.0, -250.0), // 5
-        Vec3f::new( 250.0, -250.0,  250.0), // 6
-        Vec3f::new(-250.0, -250.0,  250.0)  // 7
-    ];
-
-    let daylight_color = Vec3f::new(0.65, 0.6, 0.45);
-    let evening_color = Vec3f::new(0.65, 0.55, 0.35);
-    let mut scene = scene::DefaultScene::<GeometryList>::new(
-        BackgroundLight { intensity: daylight_color, scale: 0.0 }
-    );
-
-    // scene.add_light(AreaLight::new(
-    //     Vec3f::new(1.0, 2.48, -2.48), Vec3f::new(-1.0, -2.48, 2.48), Vec3f::new(-1.0, 2.48, -2.48),
-    //     daylight_color * 5.0
-    // ));
-
-    // scene.add_light(PointLight {
-    //     position: Vec3f::new(0.0, 2.4, 0.0),
-    //     intensity: daylight_color * 15.0
-    // });
-
-    scene.add_luminous_object(
-        Sphere { center: Vec3f::new(0.0, 170.0, 0.0), radius: 70.0 },
-        daylight_color * 15.0
-        // vec3_from_value(10.0)
-    );
-
-    {
-        // floor
-        scene.add_object(Triangle::new(cb[5], cb[4], cb[7]), white_diffuse);
-        scene.add_object(Triangle::new(cb[7], cb[6], cb[5]), white_diffuse);
-
-        // ceiling
-        scene.add_object(Triangle::new(cb[2], cb[3], cb[0]), white_diffuse);
-        scene.add_object(Triangle::new(cb[0], cb[1], cb[2]), white_diffuse);
-
-        // back wall
-        scene.add_object(Triangle::new(cb[2], cb[6], cb[7]), white_diffuse);
-        scene.add_object(Triangle::new(cb[7], cb[3], cb[2]), white_diffuse);
-
-        // left wall
-        scene.add_object(Triangle::new(cb[3], cb[7], cb[4]), red_diffuse);
-        scene.add_object(Triangle::new(cb[4], cb[0], cb[3]), red_diffuse);
-
-        // right wall
-        scene.add_object(Triangle::new(cb[1], cb[5], cb[6]), green_diffuse);
-        scene.add_object(Triangle::new(cb[6], cb[2], cb[1]), green_diffuse);
-    }
-
-    scene.add_isosurface(
-        DFieldDisplace {
-            a: Sphere { center: Vec3f::new(100.0, -120.0, 0.0), radius: 50.0 },
-            disp: triple_sin
-        },
-        white_diffuse
-    );
-
-    // scene.add_isosurface(
-    //     DFieldsBlend {
-    //         a: Sphere { center: Vec3f::new(0.50, 0.0, 0.0), radius: 0.5 },
-    //         b: Sphere { center: Vec3f::new(-0.50, 0.0, 0.0), radius: 0.5 },
-    //         // pos: Vec3f::new(0.3, -1.1, 0.45),
-    //         pos: Vec3f::new(0.4, -0.7, 0.0),
-    //         k: 0.4
-    //     },
-    //     white_diffuse
-    // );
-
-    // scene.add_isosurface(
-    //     DFieldsSubstr {
-    //         a: DFieldsBlend {
-    //             a: DFieldsBlend {
-    //                 a: Torus { radius: 0.3, thickness: 0.15, center: Vec3f::new(-0.5, 0.0, 0.0) },
-    //                 b: Torus { radius: 0.5, thickness: 0.25, center: Vec3f::new( 0.5, 0.0, 0.0) },
-    //                 k: 0.5,
-    //                 pos: Vec3f::zero()
-    //             },
-    //             b: Sphere { center: Vec3f::new(1.2, 0.2, -0.4), radius: 0.4 },
-    //             k: 0.5,
-    //             pos: Vec3f::zero()
-    //         },
-    //         b: Sphere { center: Vec3f::new(0.2, 0.4, 0.1), radius: 0.5 },
-    //         // pos: Vec3f::new(-1.3, -1.6, -0.8)
-    //         pos: Vec3f::new(-0.3, -0.7, 0.5),
-    //     },
-    //     sky_blue_mirror
-    // );
-
-    scene.add_isosurface(
-        DFieldsSubstr {
-            a: RoundBox {
-                pos: Vec3f::zero(),
-                dim: Vec3f::new(40.0, 40.0, 40.0),
-                r: 30.0
-            },
-            b: Torus {
-                radius: 40.0,
-                thickness: 40.0,
-                center: Vec3f::new(0.0, 0.0, -30.0)
-            },
-            pos: Vec3f::new(-130.0, -180.0, -50.0)
-        },
-        mirror
-    );
-
-    // scene.add_isosurface(
-    //     DFieldsSubstr {
-    //         a: DFieldsSubstr {
-    //             a: RoundBox {
-    //                 pos: Vec3f::zero(),
-    //                 dim: Vec3f::new(0.4, 0.4, 0.4),
-    //                 r: 0.2
-    //             },
-    //             b: Sphere { center: Vec3f::new(0.0, 0.4, 0.0), radius: 0.5 },
-    //             pos: Vec3f::zero(),
-    //         },
-    //         b: Sphere { center: Vec3f::new(0.0, 0.0, -0.4), radius: 0.5 },
-    //         pos: Vec3f::new(1.2, -1.9, -0.4)
-    //     },
-    //     white_diffuse
-    // );
-    // scene.add_object(Sphere { center: Vec3f::new(-1.0, -1.7, 0.2), radius: 0.8 }, mirror);
-    // scene.add_object(Sphere { center: Vec3f::new(1.2, -1.9, 0.0), radius: 0.6 }, sky_blue_diffuse);
-
-    let mut ren = EyeLight::new(cam, scene);
+    let mut ren = CpuPathTracer::new(cam, scene);
     let mut iter_nb = 0;
     let mut pixels = (0..(res.x * res.y * 4)).map(|_| 255u8).collect::<Vec<_>>();
 
@@ -279,12 +268,13 @@ fn main() {
 
         let k = 1.0 / iter_nb as f32;
         for pix in 0..(res.x * res.y) {
-            let col = fb[pix];
-            pixels[pix * 4]     = f32_to_u8(col.x * k);
-            pixels[pix * 4 + 1] = f32_to_u8(col.y * k);
-            pixels[pix * 4 + 2] = f32_to_u8(col.z * k);
+            let col = fb[pix] * k;
+            pixels[pix * 4]     = f32_to_u8(col.x);
+            pixels[pix * 4 + 1] = f32_to_u8(col.y);
+            pixels[pix * 4 + 2] = f32_to_u8(col.z);
         }
-        println!("{:?}", iter_nb);
+        print!("\r{} spp", iter_nb);
+        std::io::stdout().flush().ok().expect("Could not flush stdout");
         tex.update_from_pixels(&pixels, res.x as u32, res.y as u32, 0, 0);
         let sprite = Sprite::new_with_texture(&tex).expect("cant create sprite");
         window.clear(&Color::new_rgb(0, 0, 0));

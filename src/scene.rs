@@ -1,14 +1,11 @@
 #![allow(dead_code)]
 use brdf::Material;
-use geometry;
 use geometry::{
     Geometry, GeometryManager, Ray, Surface, SurfaceIntersection,
-    Isosurface, DistanceField, DFieldIsosurface
+    DistanceField, DFieldIsosurface
 };
 use light::{Light, BackgroundLight, LuminousObject, Luminous};
-use math::{vec3_from_value, Vec3f, One};
-use math::vector_traits::*;
-use std::rc::Rc;
+use math::Vec3f;
 
 pub type MaterialID = i32;
 pub type LightID = i32;

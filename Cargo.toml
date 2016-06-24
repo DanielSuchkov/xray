@@ -4,7 +4,7 @@ version = "0.1.0"
 authors = ["Daniel Suchkov <suc-daniil@yandex.ru>"]
 
 [dependencies]
-sfml = "0.10.1"
+sfml = "0.11.2"
 nalgebra = "0.5.1"
 num = "0.1.31"
 rand = "0.3.14"

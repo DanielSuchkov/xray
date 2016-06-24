@@ -2,7 +2,6 @@ pub use nalgebra::BaseNum;
 pub use num::traits::{Zero, One};
 
 pub const EPS_COSINE: f32 = 1e-6;
-pub const EPS_PHONG: f32 = 1e-3;
 
 pub mod vector_traits {
     pub use nalgebra::{Absolute, BaseFloat, Cross, Dot, FloatVec, Norm, Vec2, Vec3, Vec4};
@@ -118,5 +117,5 @@ pub fn smin_poly(a: f32, b: f32, k: f32) -> f32 {
 }
 
 pub fn triple_sin(p: &Vec3f) -> f32 {
-    10.0 * (0.1 * p.x).sin() * (0.1 * p.y).sin() * (0.1 * p.z).sin()
+    1.00 * (1.00 * p.x).sin() * (1.00 * p.y).sin() * (1.00 * p.z).sin()
 }

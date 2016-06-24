@@ -1,13 +1,12 @@
 #![allow(dead_code)]
 use math::vector_traits::*;
-use math;
-use math::{Vec3f, ortho, vec3_from_value, smin_exp, smin_poly, smin_pow};
+#[allow(unused_imports)]
+use math::{Vec2f, Vec3f, ortho, vec3_from_value, smin_exp, smin_poly, smin_pow};
 use scene::SurfaceProperties;
 use std::f32;
-use std::rc::Rc;
 
 pub const EPS_DIST_FIELD: f32 = 1e-4;
-pub const EPS_RAY_GEO: f32 = 1e-2;
+pub const EPS_RAY_GEO: f32 = 1e-4;
 pub const EPS_RAY_DF: f32 = 1e-2;
 pub const DELTA_GRAD: f32 = 1e-4;
 pub const MAX_DFIELD_STEPS: usize = 1024;
@@ -100,6 +99,12 @@ pub struct Torus {
     pub radius: f32,
     pub thickness: f32,
     pub center: Vec3f
+}
+
+///@TODO: impl DistanceField for it
+pub struct Cone {
+    pub c: Vec2f,
+    pub pos: Vec3f,
 }
 
 pub struct RoundBox {
@@ -440,6 +445,7 @@ impl Frame {
 }
 
 mod tests {
+    #![allow(unused_imports)]
     use super::*;
     use math::Vec3f;
     use scene::SurfaceProperties;
@@ -451,8 +457,8 @@ mod tests {
         geos.add_geometry(Surface { geometry: sphere, properties: SurfaceProperties::Material(0) });
         let ray = Ray { orig: Vec3f::new(0.0, 0.0, -5.0), dir: Vec3f::new(0.0, 0.0, 1.0) };
         assert!(geos.was_occluded(&ray, 4.0));
-        assert!(!geos.was_occluded(&ray, 3.0 - EPS_RAY));
-        assert!(geos.was_occluded(&ray, 3.0 + EPS_RAY));
+        assert!(!geos.was_occluded(&ray, 3.0 - EPS_RAY_DF));
+        assert!(geos.was_occluded(&ray, 3.0 + EPS_RAY_DF));
     }
 
     #[test]
@@ -460,8 +466,8 @@ mod tests {
         let mut geos = GeometryList::new();
         let sphere = Sphere { center: Vec3f::new(0.0, 0.0, 0.0), radius: 2.0 };
         geos.add_geometry(Surface { geometry: sphere, properties: SurfaceProperties::Material(0) });
-        let ray = Ray { orig: Vec3f::new(0.0, 0.0, -2.0), dir: Vec3f::new(0.0, 0.0, 1.0) };
-        assert!(geos.was_occluded(&ray, EPS_RAY));
+        let ray = Ray { orig: Vec3f::new(0.0, 0.0, -6.0), dir: Vec3f::new(0.0, 0.0, 1.0) };
+        assert!(!geos.was_occluded(&ray, EPS_RAY_DF));
     }
 
     #[test]
@@ -469,8 +475,8 @@ mod tests {
         let mut geos = GeometryList::new();
         let sphere = Sphere { center: Vec3f::new(0.0, 0.0, 0.0), radius: 2.0 };
         geos.add_geometry(Surface { geometry: sphere, properties: SurfaceProperties::Material(0) });
-        let ray = Ray { orig: Vec3f::new(0.0, 0.0, -2.0 - EPS_RAY * 2.0), dir: Vec3f::new(0.0, 0.0, 1.0) };
-        assert!(!geos.was_occluded(&ray, EPS_RAY));
+        let ray = Ray { orig: Vec3f::new(0.0, 0.0, -2.0 - EPS_RAY_GEO * 2.0), dir: Vec3f::new(0.0, 0.0, 1.0) };
+        assert!(!geos.was_occluded(&ray, EPS_RAY_GEO));
     }
 
     #[test]
