@@ -19,12 +19,14 @@ pub struct Brdf {
     probs: Probabilities
 }
 
+#[derive(Debug, Clone)]
 pub struct BrdfSample {
     pub wi: Vec3f, // "in" in physical meaning, i.e. from light to eye
     pub radiance: Vec3f,
     pub pdf: f32,
 }
 
+#[derive(Debug, Clone)]
 pub struct BrdfEval {
     pub radiance: Vec3f,
     pub pdf: f32,

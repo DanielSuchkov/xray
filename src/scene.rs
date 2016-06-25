@@ -2,10 +2,11 @@
 use brdf::Material;
 use geometry::{
     Geometry, GeometryManager, Ray, Surface, SurfaceIntersection,
-    DistanceField, DFieldIsosurface
+    DField, DFieldIsosurface
 };
 use light::{Light, BackgroundLight, LuminousObject, Luminous};
 use math::Vec3f;
+use std::fmt::Debug;
 
 pub type MaterialID = i32;
 pub type LightID = i32;
@@ -16,9 +17,9 @@ pub enum SurfaceProperties {
     Light(LightID),
 }
 
-// #[derive(Debug, Clone)]
+#[derive(Debug)]
 pub struct DefaultScene<T> where T: GeometryManager {
-    geo: T,
+    geo_mgr: T,
     materials: Vec<Material>,
     lights: Vec<Box<Light>>,
 }
@@ -29,12 +30,11 @@ pub trait Scene {
 
     fn add_object<G>(&mut self, geo: G, material: Material) where G: Geometry + 'static;
     fn add_isosurface<D>(&mut self, dfield: D, material: Material)
-        where D: DistanceField + 'static;
+        where D: DField + 'static;
     fn add_light<L>(&mut self, light: L) where L: Light + 'static;
     fn add_luminous_object<G>(&mut self, geo: G, intensity: Vec3f)
-        where G: Geometry + Luminous + Clone + 'static;
+        where G: Geometry + Luminous + Clone + Debug + 'static;
 
-    // fn bounding_sphere(&self) -> BSphere;
     fn get_material(&self, m_id: MaterialID) -> &Material;
     fn get_light(&self, m_id: LightID) -> &Box<Light>;
     fn get_lights_nb(&self) -> usize;
@@ -43,28 +43,28 @@ pub trait Scene {
 
 impl<T> Scene for DefaultScene<T> where T: GeometryManager {
     fn nearest_intersection(&self, ray: &Ray) -> Option<SurfaceIntersection> {
-        self.geo.nearest_intersection(ray)
+        self.geo_mgr.nearest_intersection(ray)
     }
 
     fn was_occluded(&self, ray: &Ray, dist: f32) -> bool {
-        self.geo.was_occluded(&ray, dist)
+        self.geo_mgr.was_occluded(&ray, dist)
     }
 
     fn add_object<G>(&mut self, geo: G, material: Material)
         where G: Geometry + 'static {
         let material_id = self.materials.len() as i32;
         self.materials.push(material);
-        self.geo.add_geometry(Surface {
+        self.geo_mgr.add_geometry(Surface {
             geometry: geo,
             properties: SurfaceProperties::Material(material_id)
         })
     }
 
     fn add_isosurface<D>(&mut self, dfield: D, material: Material)
-        where D: DistanceField + 'static {
+        where D: DField + 'static {
         let material_id = self.materials.len() as i32;
         self.materials.push(material);
-        self.geo.add_isosurface(DFieldIsosurface {
+        self.geo_mgr.add_isosurface(DFieldIsosurface {
             dfield: dfield,
             properties: SurfaceProperties::Material(material_id)
         })
@@ -91,11 +91,11 @@ impl<T> Scene for DefaultScene<T> where T: GeometryManager {
     }
 
     fn add_luminous_object<G>(&mut self, geo: G, intensity: Vec3f)
-        where G: Geometry + Luminous + 'static + Clone {
+        where G: Geometry + Luminous + Clone + Debug + 'static {
         let light_id = self.lights.len() as i32;
         let light = LuminousObject { object: geo.clone(), intensity: intensity };
         self.lights.push(Box::new(light));
-        self.geo.add_geometry(Surface {
+        self.geo_mgr.add_geometry(Surface {
             geometry: geo,
             properties: SurfaceProperties::Light(light_id)
         })
@@ -105,7 +105,7 @@ impl<T> Scene for DefaultScene<T> where T: GeometryManager {
 impl<T: GeometryManager> DefaultScene<T> {
     pub fn new(backlight: BackgroundLight) -> DefaultScene<T> {
         DefaultScene {
-            geo: T::new(),
+            geo_mgr: T::new(),
             materials: Vec::new(),
             lights: vec![Box::new(backlight)]
         }

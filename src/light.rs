@@ -4,6 +4,7 @@ use math::vector_traits::*;
 use geometry::{Frame, Geometry, Ray, Sphere};
 use utility::*;
 use std::f32::consts::{FRAC_1_PI, PI};
+use std::fmt::Debug;
 
 #[derive(Debug, Clone)]
 pub struct BackgroundLight {
@@ -28,12 +29,13 @@ pub struct Radiation {
     pub pdf: f32,
 }
 
-pub struct LuminousObject<L: Luminous + Geometry> {
+#[derive(Debug)]
+pub struct LuminousObject<L: Luminous + Geometry + Debug> {
     pub object: L,
     pub intensity: Vec3f,
 }
 
-pub trait Light {
+pub trait Light : Debug {
     // out_ray - "out" in physical meaning, in trace from eye to light it's "incoming"
     fn radiate(&self, out_ray: &Ray) -> Option<Radiation>; //< for brdf sampling
     fn illuminate(&self, hit_pnt: &Vec3f, rnd: (f32, f32)) -> Option<Illumination>; //< for light sampling
@@ -107,7 +109,7 @@ impl Luminous for Sphere {
     }
 }
 
-impl<L> Light for LuminousObject<L> where L: Luminous + Geometry {
+impl<L> Light for LuminousObject<L> where L: Luminous + Geometry + Debug {
     fn radiate(&self, out_ray: &Ray) -> Option<Radiation> {
         Some(Radiation {
             radiance: self.intensity,
