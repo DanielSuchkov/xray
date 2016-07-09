@@ -9,7 +9,6 @@ pub mod framebuffer;
 pub mod geometry;
 pub mod light;
 pub mod math;
-pub mod pathtracer;
 pub mod render;
 pub mod scene;
 pub mod utility;
@@ -18,14 +17,14 @@ pub mod materials_and_colors;
 use sfml::graphics::{RenderWindow, Color, RenderTarget, Texture, Sprite};
 use sfml::window::{VideoMode, ContextSettings, event, window_style};
 
-use camera::{PerspectiveCamera, CameraBuilder, Camera};
+use camera::{PerspectiveCamera, CameraBuilder};
 use geometry::{GeometryList, Sphere, Torus, Triangle, DFieldsSubstr, DFieldsBlend, RoundBox};
 use math::{Vec3f, Vec2u, Zero};
 use render::Render;
 use light::{PointLight, BackgroundLight};
 #[allow(unused_imports)]
 use render::EyeLight;
-use pathtracer::CpuPathTracer;
+use render::CpuPtMis;
 use scene::Scene;
 use std::io::prelude::*;
 use materials_and_colors::*;
@@ -249,7 +248,7 @@ fn main() {
     let scene = setup_df_blend_showcase();
     // let scene = setup_pointlight_showcase();
 
-    let mut ren = CpuPathTracer::new(cam, scene);
+    let mut ren = CpuPtMis::new(cam, scene);
     let mut iter_nb = 0;
     let mut pixels = (0..(res.x * res.y * 4)).map(|_| 255u8).collect::<Vec<_>>();
 

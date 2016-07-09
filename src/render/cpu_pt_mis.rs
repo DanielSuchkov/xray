@@ -11,7 +11,7 @@ use std::f32::consts::{PI};
 
 const MAX_PATH_LENGTH: u32 = 100;
 
-pub struct CpuPathTracer<S: Scene> {
+pub struct CpuPtMis<S: Scene> {
     frame: FrameBuffer,
     scene: S,
     camera: PerspectiveCamera,
@@ -42,7 +42,7 @@ fn mis2(current_pdf_w: f32, other_pdf_w: f32) -> f32 {
     power_heuristic2(current_pdf_w, other_pdf_w)
 }
 
-impl<S> CpuPathTracer<S> where S: Scene {
+impl<S> CpuPtMis<S> where S: Scene {
     fn uniform_sample_one_light(&self, p: &Vec3f, brdf: &Brdf) -> Vec3f {
         let mut ld = Vec3f::zero();
 
@@ -89,7 +89,7 @@ impl<S> CpuPathTracer<S> where S: Scene {
     }
 }
 
-impl<S> CpuRender for CpuPathTracer<S> where S: Scene {
+impl<S> CpuRender for CpuPtMis<S> where S: Scene {
     fn get_mut_framebuffer(&mut self) -> &mut FrameBuffer {
         &mut self.frame
     }
@@ -156,11 +156,13 @@ impl<S> CpuRender for CpuPathTracer<S> where S: Scene {
     }
 }
 
-impl<S> Render<S> for CpuPathTracer<S> where S: Scene {
-    fn new(cam: PerspectiveCamera, scene: S) -> CpuPathTracer<S> {
+impl<S> Render<S> for CpuPtMis<S> where S: Scene {
+    fn new(cam: PerspectiveCamera, scene: S) -> CpuPtMis
+<S> {
         let resolution = cam.get_view_size();
         let resolution = Vec2u::new(resolution.x as usize, resolution.y as usize);
-        CpuPathTracer {
+        CpuPtMis
+     {
             camera: cam,
             scene: scene,
             frame: FrameBuffer::new(resolution),
