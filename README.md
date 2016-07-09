@@ -1,15 +1,19 @@
 # XRay
 Simple render
 
+# Done
+* MIS
+* Distance fields
+
+# In progress
+* BDPT with MIS
+
 # Todo
 * CPU multithread path tracing
-* MIS
-* BDPT with MIS
 * OpenCL path tracing
 * BSDF
 * BSSRDF
 * Tonemapping
-* Distance fields
 * Don't leave Rust
 
 # How to build
