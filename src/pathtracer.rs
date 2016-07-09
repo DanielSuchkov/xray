@@ -18,19 +18,19 @@ pub struct CpuPathTracer<S: Scene> {
 }
 
 #[allow(dead_code)]
-fn balance_heuristic(current_pdf_w: f32, other_pdf_w: f32) -> f32 {
+fn balance_heuristic2(current_pdf_w: f32, other_pdf_w: f32) -> f32 {
     current_pdf_w / (current_pdf_w + other_pdf_w)
 }
 
 #[allow(dead_code)]
-fn power_heuristic(current_pdf_w: f32, other_pdf_w: f32) -> f32 {
+fn power_heuristic2(current_pdf_w: f32, other_pdf_w: f32) -> f32 {
     let current_pdf_2 = current_pdf_w * current_pdf_w;
     let other_pdf_2 = other_pdf_w * other_pdf_w;
     (current_pdf_2) / (current_pdf_2 + other_pdf_2)
 }
 
 #[allow(dead_code)]
-fn max_heuristic(current_pdf_w: f32, other_pdf_w: f32) -> f32 {
+fn max_heuristic2(current_pdf_w: f32, other_pdf_w: f32) -> f32 {
     if current_pdf_w >= other_pdf_w {
         1.0
     } else {
@@ -39,7 +39,7 @@ fn max_heuristic(current_pdf_w: f32, other_pdf_w: f32) -> f32 {
 }
 
 fn mis2(current_pdf_w: f32, other_pdf_w: f32) -> f32 {
-    power_heuristic(current_pdf_w, other_pdf_w)
+    power_heuristic2(current_pdf_w, other_pdf_w)
 }
 
 impl<S> CpuPathTracer<S> where S: Scene {
