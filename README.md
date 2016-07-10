@@ -4,13 +4,20 @@ Simple render
 # Done
 * MIS
 * Distance fields
+* CPU multithread path tracing
 
 # In progress
-* BDPT with MIS
+* BDPT with full path join on CPU
 
-# Todo
-* CPU multithread path tracing
-* OpenCL path tracing
+# Roadmap
+* BDPT with MIS on CPU
+* PT on GPU
+* BDPT on GPU
+* BDPT with MIS on GPU
+* SBDPT on CPU
+* SBDPT with MIS on CPU
+* SBDPT on GPU
+* SBDPT with MIS on GPU
 * BSDF
 * BSSRDF
 * Tonemapping
