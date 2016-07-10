@@ -19,22 +19,26 @@ impl FrameBuffer {
 
     pub fn add_color(&mut self, coords: (usize, usize), color: Vec3f) {
         let idx = self.idx(coords);
-        assert!(idx != self.resolution.x * self.resolution.y);
         self.frame[idx] = self.frame[idx] + color;
     }
 
     pub fn set_color(&mut self, coords: (usize, usize), color: Vec3f) {
         let idx = self.idx(coords);
-        assert!(idx != self.resolution.x * self.resolution.y);
         self.frame[idx] = color;
     }
 
     pub fn idx(&self, coords: (usize, usize)) -> usize {
+        assert!(coords.0 < self.resolution.x);
+        assert!(coords.1 < self.resolution.y);
         coords.0 + coords.1 * self.resolution.x
     }
 
     pub fn as_slice(&self) -> &[Vec3f] {
         self.frame.as_ref()
+    }
+
+    pub fn as_mut_slice(&mut self) -> &mut [Vec3f] {
+        self.frame.as_mut()
     }
 }
 

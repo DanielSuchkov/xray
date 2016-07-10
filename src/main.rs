@@ -2,6 +2,7 @@ extern crate sfml;
 extern crate nalgebra;
 extern crate num;
 extern crate rand;
+extern crate rayon;
 
 pub mod brdf;
 pub mod camera;
@@ -17,7 +18,7 @@ pub mod materials_and_colors;
 use sfml::graphics::{RenderWindow, Color, RenderTarget, Texture, Sprite};
 use sfml::window::{VideoMode, ContextSettings, event, window_style};
 
-use camera::{PerspectiveCamera, CameraBuilder};
+use camera::{Camera, PerspectiveCamera, CameraBuilder};
 use geometry::{GeometryList, Sphere, Torus, Triangle, DFieldsSubstr, DFieldsBlend, RoundBox};
 use math::{Vec3f, Vec2u, Zero};
 use render::Render;
@@ -243,12 +244,14 @@ fn main() {
         .with_zfar(10000.0)
         .build();
 
-    // let scene = setup_mis_showcase();
+    let mut frame = cam.build_framebuffer();
+
+    let scene = setup_mis_showcase();
     // let scene = setup_df_showcase();
-    let scene = setup_df_blend_showcase();
+    // let scene = setup_df_blend_showcase();
     // let scene = setup_pointlight_showcase();
 
-    let mut ren = CpuPtMis::new(cam, scene);
+    let ren = CpuPtMis::new(cam, scene);
     let mut iter_nb = 0;
     let mut pixels = (0..(res.x * res.y * 4)).map(|_| 255u8).collect::<Vec<_>>();
 
@@ -262,8 +265,8 @@ fn main() {
             }
         }
 
-        ren.iterate(iter_nb);
-        let fb = ren.get_framebuffer().as_slice();
+        ren.iterate(iter_nb, &mut frame);
+        let fb = frame.as_slice();
 
         let k = 1.0 / iter_nb as f32;
         for pix in 0..(res.x * res.y) {

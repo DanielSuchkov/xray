@@ -1,18 +1,17 @@
-use brdf::{Brdf};
-use camera::PerspectiveCamera;
+use brdf::Brdf;
+use camera::{Camera, PerspectiveCamera};
 use framebuffer::FrameBuffer;
 use geometry::Ray;
 use math::vector_traits::*;
-use math::{Vec2u, Vec3f, Vec2f, Zero, One};
+use math::{Vec3f, Vec2f, Zero, One};
 use rand::{Rng, thread_rng};
-use render::{Render, CpuRender};
+use render::{Render, /*CpuStRender, */CpuMtRender};
 use scene::{Scene, SurfaceProperties};
-use std::f32::consts::{PI};
+use std::f32::consts::PI;
 
 const MAX_PATH_LENGTH: u32 = 100;
 
 pub struct CpuPtMis<S: Scene> {
-    frame: FrameBuffer,
     scene: S,
     camera: PerspectiveCamera,
 }
@@ -89,11 +88,9 @@ impl<S> CpuPtMis<S> where S: Scene {
     }
 }
 
-impl<S> CpuRender for CpuPtMis<S> where S: Scene {
-    fn get_mut_framebuffer(&mut self) -> &mut FrameBuffer {
-        &mut self.frame
-    }
+unsafe impl<S> Sync for CpuPtMis<S> where S: Scene {}
 
+impl<S> CpuMtRender for CpuPtMis<S> where S: Scene {
     fn get_view_size(&self) -> Vec2f {
         self.camera.get_view_size()
     }
@@ -108,9 +105,7 @@ impl<S> CpuRender for CpuPtMis<S> where S: Scene {
                 Some(isect) => isect,
                 None => {
                     if path_length == 0 {
-                        if let Some(back_rad) = self.scene.get_background_light().radiate(&ray) {
-                           color = back_rad.radiance;
-                       }
+                        self.scene.get_background_light().radiate(&ray).map(|rad| { color = rad.radiance; });
                     }
                     break 'current_path;
                 }
@@ -157,23 +152,14 @@ impl<S> CpuRender for CpuPtMis<S> where S: Scene {
 }
 
 impl<S> Render<S> for CpuPtMis<S> where S: Scene {
-    fn new(cam: PerspectiveCamera, scene: S) -> CpuPtMis
-<S> {
-        let resolution = cam.get_view_size();
-        let resolution = Vec2u::new(resolution.x as usize, resolution.y as usize);
-        CpuPtMis
-     {
+    fn new(cam: PerspectiveCamera, scene: S) -> CpuPtMis<S> {
+        CpuPtMis {
             camera: cam,
             scene: scene,
-            frame: FrameBuffer::new(resolution),
         }
     }
 
-    fn iterate(&mut self, iter_nb: usize) {
-        self.iterate_over_screen(iter_nb)
-    }
-
-    fn get_framebuffer(&self) -> &FrameBuffer {
-        &self.frame
+    fn iterate(&self, iter_nb: usize, frame: &mut FrameBuffer) {
+        self.iterate_over_screen(iter_nb, frame)
     }
 }

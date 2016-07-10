@@ -5,6 +5,7 @@ use math::vector_traits::*;
 use math::{Mat4f, Rot3f, Vec2f, Vec2u, Vec3f, Vec4f};
 use math;
 use std::marker::PhantomData;
+use framebuffer::FrameBuffer;
 
 #[derive(Clone, Debug)]
 pub struct CameraBuilder<T: Camera> {
@@ -31,6 +32,13 @@ pub struct PerspectiveCamera {
 
 pub trait Camera {
     fn new(pos: Vec3f, at: Vec3f, up: Vec3f, view_size: Vec2f, fov: f32, near: f32, far: f32) -> Self;
+
+    fn get_view_size(&self) -> Vec2f;
+
+    fn build_framebuffer(&self) -> FrameBuffer {
+        let view_size = self.get_view_size();
+        FrameBuffer::new(Vec2u { x: view_size.x as usize, y: view_size.y as usize })
+    }
 }
 
 impl<T> CameraBuilder<T> where T: Camera {
@@ -113,6 +121,10 @@ impl Camera for PerspectiveCamera {
             // world2raster: world2raster,
             view_size: view_size,
         }
+    }
+
+    fn get_view_size(&self) -> Vec2f {
+        self.view_size
     }
 }
 
@@ -218,10 +230,6 @@ impl PerspectiveCamera {
 
     pub fn get_position(&self) -> Vec3f {
         self.position
-    }
-
-    pub fn get_view_size(&self) -> Vec2f {
-        self.view_size
     }
 
     pub fn apply_raster2world(&self, vec: &Vec3f) -> Vec3f {
