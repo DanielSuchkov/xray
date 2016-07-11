@@ -11,7 +11,7 @@ use std::f32::consts::PI;
 
 const MAX_PATH_LENGTH: u32 = 100;
 
-pub struct CpuPtMis<S: Scene> {
+pub struct CpuPtDl<S: Scene> {
     scene: S,
     camera: PerspectiveCamera,
 }
@@ -41,37 +41,13 @@ fn mis2(current_pdf_w: f32, other_pdf_w: f32) -> f32 {
     power_heuristic2(current_pdf_w, other_pdf_w)
 }
 
-impl<S> CpuPtMis<S> where S: Scene {
+impl<S> CpuPtDl<S> where S: Scene {
     fn uniform_sample_one_light(&self, p: &Vec3f, brdf: &Brdf) -> Vec3f {
         let mut ld = Vec3f::zero();
 
         let lights_nb = self.scene.get_lights_nb() as u32;
         let light_nb = (thread_rng().next_u32() % lights_nb) as i32;
-        let light_pick_prob = 1.0 / lights_nb as f32;
-        // let light_pick_prob = 1.0;
         let rand_light = self.scene.get_light(light_nb);
-
-        // brdf sampling
-        let sample_rnds = (thread_rng().next_f32(), thread_rng().next_f32(), thread_rng().next_f32());
-        if let Some(sample) = brdf.sample(sample_rnds) {
-            let brdf_ray = Ray { dir: sample.wi, orig: *p };
-            if let Some(isect) = self.scene.nearest_intersection(&brdf_ray) {
-                match isect.surface {
-                    SurfaceProperties::Light(light_id) if light_nb == light_id => {
-                        if let Some(rad) = rand_light.radiate(&brdf_ray) {
-                            let weight = mis2(sample.pdf, rad.pdf * light_pick_prob);
-                            ld = ld + sample.radiance * rad.radiance * weight;
-                        }
-                    },
-                    _ => {}
-                }
-            } else if light_nb == 0 {
-                rand_light.radiate(&brdf_ray).map(|rad| {
-                    let weight = mis2(sample.pdf, rad.pdf * light_pick_prob);
-                    ld = ld + sample.radiance * rad.radiance * weight;
-                });
-            };
-        }
 
         // light sampling
         let rands = (thread_rng().next_f32(), thread_rng().next_f32());
@@ -79,8 +55,7 @@ impl<S> CpuPtMis<S> where S: Scene {
             if let Some(brdf_eval) = brdf.eval(&illum.l_dir) {
                 let shadow_ray = Ray { orig: *p, dir: illum.l_dir };
                 if !self.scene.was_occluded(&shadow_ray, illum.l_dist) {
-                    let weight = mis2(illum.pdf * light_pick_prob, brdf_eval.pdf);
-                    ld = ld + illum.radiance * brdf_eval.radiance * weight;
+                    ld = ld + illum.radiance * brdf_eval.radiance;
                 }
             }
         }
@@ -88,9 +63,9 @@ impl<S> CpuPtMis<S> where S: Scene {
     }
 }
 
-unsafe impl<S> Sync for CpuPtMis<S> where S: Scene {}
+unsafe impl<S> Sync for CpuPtDl<S> where S: Scene {}
 
-impl<S> CpuMtRender for CpuPtMis<S> where S: Scene {
+impl<S> CpuMtRender for CpuPtDl<S> where S: Scene {
     fn get_view_size(&self) -> Vec2f {
         self.camera.get_view_size()
     }
@@ -151,9 +126,9 @@ impl<S> CpuMtRender for CpuPtMis<S> where S: Scene {
     }
 }
 
-impl<S> Render<S> for CpuPtMis<S> where S: Scene {
-    fn new(cam: PerspectiveCamera, scene: S) -> CpuPtMis<S> {
-        CpuPtMis {
+impl<S> Render<S> for CpuPtDl<S> where S: Scene {
+    fn new(cam: PerspectiveCamera, scene: S) -> CpuPtDl<S> {
+        CpuPtDl {
             camera: cam,
             scene: scene,
         }

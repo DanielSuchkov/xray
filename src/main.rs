@@ -24,8 +24,7 @@ use math::{Vec3f, Vec2u, Zero};
 use render::Render;
 use light::{PointLight, BackgroundLight};
 #[allow(unused_imports)]
-use render::EyeLight;
-use render::CpuPtMis;
+use render::{EyeLight, CpuPt, CpuPtMis, CpuPtDl};
 use scene::Scene;
 use std::io::prelude::*;
 use materials_and_colors::*;
@@ -229,7 +228,7 @@ fn main() {
     // let res = Vec2u::new(250, 250);
     let mut window = RenderWindow::new(
             VideoMode::new_init(res.x as u32, res.y as u32, 32),
-            "XRay-MIS",
+            "XRay",
             window_style::CLOSE,
             &ContextSettings::default())
         .expect("Cannot create a new Render Window.");
@@ -251,7 +250,7 @@ fn main() {
     // let scene = setup_df_blend_showcase();
     // let scene = setup_pointlight_showcase();
 
-    let ren = CpuPtMis::new(cam, scene);
+    let ren = CpuPtDl::new(cam, scene);
     let mut iter_nb = 0;
     let mut pixels = (0..(res.x * res.y * 4)).map(|_| 255u8).collect::<Vec<_>>();
 
