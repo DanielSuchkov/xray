@@ -31,4 +31,6 @@ Simple render
 * Don't leave Rust
 
 # How to build
-You need SFML and CSFML. That's all (for now).
+1. Download latest stable Rust.
+2. Install SFML and CSFML.
+3. Run `cargo build --release`
