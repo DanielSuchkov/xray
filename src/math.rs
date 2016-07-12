@@ -70,6 +70,7 @@ use self::vector_traits::*;
 use self::matrix_traits::*;
 
 pub type Mat4f = Mat4<f32>;
+pub type Mat3f = Mat3<f32>;
 pub type Rot3f = Rot3<f32>;
 pub type Vec4f = Vec4<f32>;
 pub type Vec3f = Vec3<f32>;

@@ -261,9 +261,12 @@ impl PerspectiveCamera {
 //        self.raster2world = self.world2raster.inv().expect("WTF?!");
     }
 
-//     fn compute_world_mat(&self) -> Mat4f {
-//         self.projection.to_mat() * self.rotation.to_mat() * self.translation.to_mat() * self.scale.to_mat()
-//     }
+    // fn compute_world_mat(&self) -> Mat4f {
+    //     self.projection.to_mat()
+    //     * self.rotation.to_mat()
+    //     * self.translation.to_mat()
+    //     * self.scale.to_mat()
+    // }
 }
 
 mod tests {
