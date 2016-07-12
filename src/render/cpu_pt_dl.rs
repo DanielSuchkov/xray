@@ -1,6 +1,6 @@
 use brdf::Brdf;
 use camera::{Camera, PerspectiveCamera};
-use framebuffer::FrameBuffer;
+use framebuffer::RgbFrameBuffer;
 use geometry::Ray;
 use math::vector_traits::*;
 use math::{Vec3f, Vec2f, Zero, One};
@@ -134,7 +134,7 @@ impl<S> Render<S> for CpuPtDl<S> where S: Scene {
         }
     }
 
-    fn iterate(&self, iter_nb: usize, frame: &mut FrameBuffer) {
+    fn iterate(&self, iter_nb: usize, frame: &mut RgbFrameBuffer) {
         self.iterate_over_screen(iter_nb, frame)
     }
 }

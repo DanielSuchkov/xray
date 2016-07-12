@@ -1,6 +1,6 @@
 use brdf::Brdf;
 use camera::{Camera, PerspectiveCamera};
-use framebuffer::FrameBuffer;
+use framebuffer::RgbFrameBuffer;
 use geometry::Ray;
 use math::vector_traits::*;
 use math::{Vec3f, Vec2f, Zero, One};
@@ -47,7 +47,7 @@ impl<S> CpuPtMis<S> where S: Scene {
 
         let lights_nb = self.scene.get_lights_nb() as u32;
         let light_nb = (thread_rng().next_u32() % lights_nb) as i32;
-        // let light_pick_prob = 1.0 / lights_nb as f32;
+        let light_pick_prob = 1.0 / lights_nb as f32;
         // let light_pick_prob = 1.0;
         let rand_light = self.scene.get_light(light_nb);
 
@@ -67,7 +67,7 @@ impl<S> CpuPtMis<S> where S: Scene {
                 }
             } else if light_nb == 0 {
                 rand_light.radiate(&brdf_ray).map(|rad| {
-                    let weight = mis2(sample.pdf, rad.pdf/* * light_pick_prob*/);
+                    let weight = mis2(sample.pdf, rad.pdf * light_pick_prob);
                     ld = ld + sample.radiance * rad.radiance * weight;
                 });
             };
@@ -79,7 +79,7 @@ impl<S> CpuPtMis<S> where S: Scene {
             if let Some(brdf_eval) = brdf.eval(&illum.l_dir) {
                 let shadow_ray = Ray { orig: *p, dir: illum.l_dir };
                 if !self.scene.was_occluded(&shadow_ray, illum.l_dist) {
-                    let weight = mis2(illum.pdf/* * light_pick_prob*/, brdf_eval.pdf);
+                    let weight = mis2(illum.pdf * light_pick_prob, brdf_eval.pdf);
                     ld = ld + illum.radiance * brdf_eval.radiance * weight * lights_nb as f32;
                 }
             }
@@ -121,8 +121,8 @@ impl<S> CpuMtRender for CpuPtMis<S> where S: Scene {
                 SurfaceProperties::Light(light_id) => {
                     if path_length == 0 {
                         if let Some(rad) = self.scene.get_light(light_id).radiate(&ray) {
-                            let max_component = rad.radiance.x.max(rad.radiance.y.max(rad.radiance.z));
-                            color = rad.radiance / max_component * PI;
+                            // @TODO Remove this when HDR will be implemented
+                            color = rad.radiance / rad.radiance.fold(f32::max) * PI;
                         }
                     }
                     break 'current_path;
@@ -159,7 +159,7 @@ impl<S> Render<S> for CpuPtMis<S> where S: Scene {
         }
     }
 
-    fn iterate(&self, iter_nb: usize, frame: &mut FrameBuffer) {
+    fn iterate(&self, iter_nb: usize, frame: &mut RgbFrameBuffer) {
         self.iterate_over_screen(iter_nb, frame)
     }
 }

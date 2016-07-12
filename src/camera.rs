@@ -5,7 +5,7 @@ use math::vector_traits::*;
 use math::{Mat4f, Rot3f, Vec2f, Vec2u, Vec3f, Vec4f};
 use math;
 use std::marker::PhantomData;
-use framebuffer::FrameBuffer;
+use framebuffer::RgbFrameBuffer;
 
 #[derive(Clone, Debug)]
 pub struct CameraBuilder<T: Camera> {
@@ -35,9 +35,9 @@ pub trait Camera {
 
     fn get_view_size(&self) -> Vec2f;
 
-    fn build_framebuffer(&self) -> FrameBuffer {
+    fn build_framebuffer(&self) -> RgbFrameBuffer {
         let view_size = self.get_view_size();
-        FrameBuffer::new(Vec2u { x: view_size.x as usize, y: view_size.y as usize })
+        RgbFrameBuffer::new(Vec2u { x: view_size.x as usize, y: view_size.y as usize })
     }
 }
 

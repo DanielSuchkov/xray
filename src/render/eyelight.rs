@@ -1,7 +1,7 @@
 use render::{Render, CpuStRender};
 use scene::{Scene, SurfaceProperties};
 use camera::{Camera, PerspectiveCamera};
-use framebuffer::FrameBuffer;
+use framebuffer::RgbFrameBuffer;
 use math::{Vec2f, Vec3f, vec3_from_value, Zero};
 use math::vector_traits::*;
 
@@ -46,7 +46,7 @@ impl<S> Render<S> for EyeLight<S> where S: Scene {
         }
     }
 
-    fn iterate(&self, iter_nb: usize, frame: &mut FrameBuffer) {
+    fn iterate(&self, iter_nb: usize, frame: &mut RgbFrameBuffer) {
         self.iterate_over_screen(iter_nb, frame)
     }
 }

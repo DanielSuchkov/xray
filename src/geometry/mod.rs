@@ -134,11 +134,7 @@ impl DField for Torus {
 impl DField for RoundBox {
     fn dist(&self, point: &Vec3f) -> f32 {
         let p = *point - self.pos;
-        let abs_pb = Vec3f{
-            x: (p.x.abs() - self.dim.x).max(0.0),
-            y: (p.y.abs() - self.dim.y).max(0.0),
-            z: (p.z.abs() - self.dim.z).max(0.0)
-        };
+        let abs_pb = p.zip(&self.dim, |x, y| (x.abs() - y).max(0.0));
         abs_pb.norm() - self.r
     }
 }

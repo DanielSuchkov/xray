@@ -3,15 +3,15 @@ use math::{Vec3f, Vec2u, Zero};
 use std::borrow::Borrow;
 
 #[derive(Debug, Clone)]
-pub struct FrameBuffer {
+pub struct RgbFrameBuffer {
     frame: Vec<Vec3f>,
     resolution: Vec2u,
 }
 
-impl FrameBuffer {
-    pub fn new(resolution: Vec2u) -> FrameBuffer {
+impl RgbFrameBuffer {
+    pub fn new(resolution: Vec2u) -> RgbFrameBuffer {
         let n = resolution.x * resolution.y;
-        FrameBuffer {
+        RgbFrameBuffer {
             frame: (0..n).map(|_| Zero::zero()).collect(),
             resolution: resolution
         }
@@ -42,7 +42,7 @@ impl FrameBuffer {
     }
 }
 
-impl Borrow<[Vec3f]> for FrameBuffer {
+impl Borrow<[Vec3f]> for RgbFrameBuffer {
     fn borrow(&self) -> &[Vec3f] {
         self.as_slice()
     }

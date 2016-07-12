@@ -1,6 +1,6 @@
 #![allow(dead_code)]
 use camera::PerspectiveCamera;
-use framebuffer::FrameBuffer;
+use framebuffer::RgbFrameBuffer;
 use math::{Vec2f, Vec3f};
 use rand::{Rng, thread_rng};
 use scene::Scene;
@@ -18,11 +18,11 @@ pub use self::cpu_pt_dl::CpuPtDl;
 
 pub trait Render<S: Scene> {
     fn new(cam: PerspectiveCamera, scene: S) -> Self;
-    fn iterate(&self, iter_nb: usize, frame: &mut FrameBuffer);
+    fn iterate(&self, iter_nb: usize, frame: &mut RgbFrameBuffer);
 }
 
 pub trait CpuStRender {
-    fn iterate_over_screen(&self, _iter_nb: usize, frame: &mut FrameBuffer) {
+    fn iterate_over_screen(&self, _iter_nb: usize, frame: &mut RgbFrameBuffer) {
         let res_x = self.get_view_size().x as usize;
         frame.as_mut_slice().iter_mut().enumerate().all(|(pix_nb, pix)| {
             let (x, y) = (pix_nb % res_x, pix_nb / res_x);
@@ -39,7 +39,7 @@ pub trait CpuStRender {
 }
 
 pub trait CpuMtRender where Self: Sync {
-    fn iterate_over_screen(&self, _iter_nb: usize, frame: &mut FrameBuffer) {
+    fn iterate_over_screen(&self, _iter_nb: usize, frame: &mut RgbFrameBuffer) {
         let res_x = self.get_view_size().x as usize;
         frame.as_mut_slice().par_iter_mut().enumerate().for_each(|(pix_nb, pix)| {
             let (x, y) = (pix_nb % res_x, pix_nb / res_x);

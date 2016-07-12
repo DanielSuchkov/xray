@@ -9,18 +9,33 @@ pub mod vector_traits {
     pub trait VectorExtra<T>: FloatVec<T> where T: BaseFloat {
         fn reflect_local(&self) -> Self;
         fn reflect_global(&self, normal: &Self) -> Self;
+        fn fold<F>(&self, f: F) -> T where F: Fn(T, T) -> T;
+        fn map<F>(&self, f: F) -> Self where F: Fn(T) -> T;
+        fn zip<F>(&self, other: &Self, f: F) -> Self where F: Fn(T, T) -> T;
     }
 
-    impl<S> VectorExtra<S> for Vec3<S>
-        where S: From<f32> + BaseFloat,
-              Vec3<S>: FloatVec<S> {
-        fn reflect_local(&self) -> Vec3<S> {
+    impl<T> VectorExtra<T> for Vec3<T>
+        where T: From<f32> + BaseFloat,
+              Vec3<T>: FloatVec<T> {
+        fn reflect_local(&self) -> Vec3<T> {
             Vec3::new(-self.x, -self.y, self.z)
         }
 
-        fn reflect_global(&self, normal: &Vec3<S>) -> Vec3<S> {
-            let scale: S = <S as From<f32>>::from(2.0) * self.dot(normal).abs();
+        fn reflect_global(&self, normal: &Self) -> Self {
+            let scale = <T as From<f32>>::from(2.0) * self.dot(normal).abs();
             (*self + normal.clone() * scale).normalize()
+        }
+
+        fn fold<F>(&self, f: F) -> T where F: Fn(T, T) -> T {
+            f(f(self.x, self.y), self.z)
+        }
+
+        fn map<F>(&self, f: F) -> Self where F: Fn(T) -> T {
+            Vec3::new(f(self.x), f(self.y), f(self.z))
+        }
+
+        fn zip<F>(&self, other: &Self, f: F) -> Self where F: Fn(T, T) -> T {
+            Vec3::new(f(self.x, other.x), f(self.y, other.y), f(self.z, other.z))
         }
     }
 }
@@ -117,5 +132,6 @@ pub fn smin_poly(a: f32, b: f32, k: f32) -> f32 {
 }
 
 pub fn triple_sin(p: &Vec3f) -> f32 {
-    1.00 * (1.00 * p.x).sin() * (1.00 * p.y).sin() * (1.00 * p.z).sin()
+    p.map(|x| (1.0 * x).sin()).fold(|x, y| x * y)
+    // 1.00 * (1.00 * p.x).sin() * (1.00 * p.y).sin() * (1.00 * p.z).sin()
 }
