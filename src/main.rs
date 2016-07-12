@@ -223,8 +223,8 @@ fn setup_df_blend_showcase() -> scene::DefaultScene<GeometryList> {
 }
 
 fn main() {
-    let res = Vec2u::new(1000, 1000);
-    // let res = Vec2u::new(500, 500);
+    // let res = Vec2u::new(1000, 1000);
+    let res = Vec2u::new(500, 500);
     // let res = Vec2u::new(250, 250);
     let mut window = RenderWindow::new(
             VideoMode::new_init(res.x as u32, res.y as u32, 32),
@@ -250,7 +250,7 @@ fn main() {
     // let scene = setup_df_blend_showcase();
     // let scene = setup_pointlight_showcase();
 
-    let ren = CpuPtDl::new(cam, scene);
+    let ren = CpuPtMis::new(cam, scene);
     let mut iter_nb = 0;
     let mut pixels = (0..(res.x * res.y * 4)).map(|_| 255u8).collect::<Vec<_>>();
 

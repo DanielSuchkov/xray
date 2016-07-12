@@ -31,9 +31,9 @@ impl<S> CpuMtRender for CpuPt<S> where S: Scene {
             let isect = match self.scene.nearest_intersection(&ray) {
                 Some(isect) => isect,
                 None => {
-                    if path_length == 0 {
-                        self.scene.get_background_light().radiate(&ray).map(|rad| { color = rad.radiance; });
-                    }
+                    self.scene.get_background_light().radiate(&ray).map(|rad| {
+                        color = rad.radiance * path_weight;
+                    });
                     break 'current_path;
                 }
             };

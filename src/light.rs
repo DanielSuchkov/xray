@@ -47,6 +47,7 @@ pub trait Luminous {
     fn dir_pdf(&self, ray: &Ray) -> f32;
 }
 
+///@FIXME something wrong with direct lighting (aka next event estimation)
 impl Light for BackgroundLight {
     fn radiate(&self, _out_ray: &Ray) -> Option<Radiation> {
         Some(Radiation {
@@ -56,7 +57,7 @@ impl Light for BackgroundLight {
     }
 
     fn illuminate(&self, _hit_pnt: &Vec3f, rnd: (f32, f32)) -> Option<Illumination> {
-        let (dir, pdf) = uniform_hemisphere_sample_w(rnd);
+        let (dir, pdf) = (uniform_sphere_sample(rnd), uniform_sphere_pdf_w());
         Some(Illumination {
             radiance: self.intensity,
             l_dir: -dir,

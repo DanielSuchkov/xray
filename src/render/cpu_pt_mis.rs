@@ -47,7 +47,7 @@ impl<S> CpuPtMis<S> where S: Scene {
 
         let lights_nb = self.scene.get_lights_nb() as u32;
         let light_nb = (thread_rng().next_u32() % lights_nb) as i32;
-        let light_pick_prob = 1.0 / lights_nb as f32;
+        // let light_pick_prob = 1.0 / lights_nb as f32;
         // let light_pick_prob = 1.0;
         let rand_light = self.scene.get_light(light_nb);
 
@@ -59,7 +59,7 @@ impl<S> CpuPtMis<S> where S: Scene {
                 match isect.surface {
                     SurfaceProperties::Light(light_id) if light_nb == light_id => {
                         if let Some(rad) = rand_light.radiate(&brdf_ray) {
-                            let weight = mis2(sample.pdf, rad.pdf * light_pick_prob);
+                            let weight = mis2(sample.pdf, rad.pdf/* * light_pick_prob*/);
                             ld = ld + sample.radiance * rad.radiance * weight;
                         }
                     },
@@ -67,7 +67,7 @@ impl<S> CpuPtMis<S> where S: Scene {
                 }
             } else if light_nb == 0 {
                 rand_light.radiate(&brdf_ray).map(|rad| {
-                    let weight = mis2(sample.pdf, rad.pdf * light_pick_prob);
+                    let weight = mis2(sample.pdf, rad.pdf/* * light_pick_prob*/);
                     ld = ld + sample.radiance * rad.radiance * weight;
                 });
             };
@@ -79,12 +79,12 @@ impl<S> CpuPtMis<S> where S: Scene {
             if let Some(brdf_eval) = brdf.eval(&illum.l_dir) {
                 let shadow_ray = Ray { orig: *p, dir: illum.l_dir };
                 if !self.scene.was_occluded(&shadow_ray, illum.l_dist) {
-                    let weight = mis2(illum.pdf * light_pick_prob, brdf_eval.pdf);
-                    ld = ld + illum.radiance * brdf_eval.radiance * weight;
+                    let weight = mis2(illum.pdf/* * light_pick_prob*/, brdf_eval.pdf);
+                    ld = ld + illum.radiance * brdf_eval.radiance * weight * lights_nb as f32;
                 }
             }
         }
-        ld * lights_nb as f32
+        ld
     }
 }
 
