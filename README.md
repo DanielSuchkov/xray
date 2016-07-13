@@ -6,6 +6,7 @@ Simple render
 * Lambert/Phong (for both sampling strategies)
 * PT with MIS
 * DF
+* Tone mapping
 * CPU multithreading
 
 # In progress
@@ -27,7 +28,6 @@ Simple render
 * SBDPT on GPU
 * SBDPT with MIS on GPU
 * BSSRDF
-* Tonemapping
 * Don't leave Rust
 
 # How to build
