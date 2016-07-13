@@ -28,9 +28,10 @@ use render::{EyeLight, CpuPt, CpuPtMis, CpuPtDl};
 use scene::Scene;
 use std::io::prelude::*;
 use materials_and_colors::*;
+use framebuffer::log_tone_mapping;
 
 fn f32_to_u8(f: f32) -> u8 {
-    (f.min(1.0) * 255.0) as u8
+    (f * 255.0) as u8
 }
 
 const CB: [Vec3f; 8] = [
@@ -223,8 +224,8 @@ fn setup_df_blend_showcase() -> scene::DefaultScene<GeometryList> {
 }
 
 fn main() {
-    // let res = Vec2u::new(1000, 1000);
-    let res = Vec2u::new(500, 500);
+    let res = Vec2u::new(1000, 1000);
+    // let res = Vec2u::new(500, 500);
     // let res = Vec2u::new(250, 250);
     let mut window = RenderWindow::new(
             VideoMode::new_init(res.x as u32, res.y as u32, 32),
@@ -243,7 +244,8 @@ fn main() {
         .with_zfar(10000.0)
         .build();
 
-    let mut frame = cam.build_framebuffer();
+    let mut frame = cam.build_rgb_framebuffer();
+    let mut yxy_frame = cam.build_yxy_framebuffer();
 
     let scene = setup_mis_showcase();
     // let scene = setup_df_showcase();
@@ -265,15 +267,22 @@ fn main() {
         }
 
         ren.iterate(iter_nb, &mut frame);
-        let fb = frame.as_slice();
-
         let k = 1.0 / iter_nb as f32;
-        for pix in 0..(res.x * res.y) {
-            let col = fb[pix] * k;
-            pixels[pix * 4]     = f32_to_u8(col.x);
-            pixels[pix * 4 + 1] = f32_to_u8(col.y);
-            pixels[pix * 4 + 2] = f32_to_u8(col.z);
+        let frame_lum = frame.to_yxy_inplace(&mut yxy_frame, k);
+        log_tone_mapping(&mut yxy_frame, frame_lum);
+        let rgb_frame = yxy_frame.into_rgb();
+
+        {
+            let fb = rgb_frame.as_slice();
+            // let fb = frame.as_slice();
+            for pix in 0..(res.x * res.y) {
+                let col = fb[pix];
+                pixels[pix * 4]     = f32_to_u8(col.x);
+                pixels[pix * 4 + 1] = f32_to_u8(col.y);
+                pixels[pix * 4 + 2] = f32_to_u8(col.z);
+            }
         }
+        unsafe { yxy_frame = rgb_frame.as_yxy(); }
         print!("\r{} spp", iter_nb);
         std::io::stdout().flush().ok().expect("Could not flush stdout");
         tex.update_from_pixels(&pixels, res.x as u32, res.y as u32, 0, 0);

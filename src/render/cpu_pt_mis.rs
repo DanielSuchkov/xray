@@ -7,7 +7,6 @@ use math::{Vec3f, Vec2f, Zero, One};
 use rand::{Rng, thread_rng};
 use render::{Render, /*CpuStRender, */CpuMtRender};
 use scene::{Scene, SurfaceProperties};
-use std::f32::consts::PI;
 
 const MAX_PATH_LENGTH: u32 = 100;
 
@@ -122,7 +121,12 @@ impl<S> CpuMtRender for CpuPtMis<S> where S: Scene {
                     if path_length == 0 {
                         if let Some(rad) = self.scene.get_light(light_id).radiate(&ray) {
                             // @TODO Remove this when HDR will be implemented
-                            color = rad.radiance / rad.radiance.fold(f32::max) * PI;
+                            let max_comp = rad.radiance.fold(f32::max);
+                            if max_comp > 10.0 {
+                                color = rad.radiance / max_comp * 10.0;
+                            } else {
+                                color = rad.radiance;
+                            }
                         }
                     }
                     break 'current_path;
